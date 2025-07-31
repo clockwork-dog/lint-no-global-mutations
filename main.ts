@@ -1,7 +1,7 @@
 import { parse } from "espree";
 import { traverse, types } from "estree-toolkit";
 
-const ALLOWED_OBJECT_PROTOTYPE_METHODS = new Set([
+const NON_MUTATING_OBJECT_PROTOTYPE_METHODS = new Set([
   // "assign",
   "create",
   // "defineProperties",
@@ -25,6 +25,47 @@ const ALLOWED_OBJECT_PROTOTYPE_METHODS = new Set([
   // "seal",
   // "setPrototypeOf",
   "values",
+]);
+
+const NON_MUTATING_ARRAY_INSTANCE_METHODS = new Set([
+  "at",
+  "concat",
+  // "copyWithin",
+  "entries",
+  "every",
+  // "fill",
+  "filter",
+  "find",
+  "findIndex",
+  "findLast",
+  "findLastIndex",
+  "flat",
+  "flatMap",
+  "forEach",
+  "includes",
+  "indexOf",
+  "join",
+  "keys",
+  "lastIndexOf",
+  "map",
+  // "pop",
+  // "push",
+  "reduce",
+  "reduceRight",
+  // "reverse",
+  // "shift",
+  "slice",
+  "some",
+  // "sort",
+  // "splice",
+  "toLocaleString",
+  "toReversed",
+  "toSorted",
+  "toSpliced",
+  "toString",
+  // "unshift",
+  "values",
+  "with",
 ]);
 
 export class LintingError extends Error {
@@ -168,7 +209,7 @@ function getDeepFlags(
         if (ident.isObjectPrototype || ex.object.name === "Object") {
           if (
             ex.property.type !== "Identifier" ||
-            !ALLOWED_OBJECT_PROTOTYPE_METHODS.has(ex.property.name)
+            !NON_MUTATING_OBJECT_PROTOTYPE_METHODS.has(ex.property.name)
           ) {
             mergeFlags(flags, {
               isObjectPrototype: true,
@@ -182,6 +223,15 @@ function getDeepFlags(
       return flags;
     }
 
+    case "CallExpression": {
+      if (ex.callee.type !== "Super") {
+        mergeFlags(flags, getDeepFlags(ex.callee, scopes));
+      }
+      ex.arguments.forEach((arg) => {
+        mergeFlags(flags, getDeepFlags(arg, scopes));
+      });
+      return flags;
+    }
     case "JSXElement":
     case "JSXFragment":
     case "ThisExpression":
@@ -192,7 +242,6 @@ function getDeepFlags(
     case "AssignmentExpression":
     case "LogicalExpression":
     case "ConditionalExpression":
-    case "CallExpression":
     case "NewExpression":
     case "SequenceExpression":
     case "ArrowFunctionExpression":
@@ -206,6 +255,8 @@ function getDeepFlags(
     case "ImportExpression":
     case "Super":
   }
+  console.log(ex.type);
+
   throw new Error("Unhandled case");
 }
 
@@ -362,13 +413,33 @@ export function stopGlobalMutationLinter(
       }
     },
     CallExpression(path) {
+      if (!path.node) {
+        return;
+      }
+      const callee = path.node.callee;
+      if (callee.type === "Super") {
+        return;
+      }
+      const flags = getDeepFlags(callee, scopes);
+      // Object prototype mutation with global as argument
+      if (getDeepFlags(callee, scopes).isMutationFunction) {
+        lintingErrors.push(node2LintingError("Invalid mutation", path.node));
+      }
+
+      // Array instance mutation method
       if (
-        path.node &&
-        getDeepFlags(path.node.callee, scopes).isMutationFunction
+        callee.type === "MemberExpression" &&
+        getDeepFlags(callee.object, scopes).isGloballyDependent
       ) {
-        lintingErrors.push(
-          node2LintingError("Invalid mutation", path.node),
-        );
+        if (
+          callee.property.type === "Identifier" &&
+          NON_MUTATING_ARRAY_INSTANCE_METHODS.has(callee.property.name)
+        ) {
+          // These are allowed
+        } else {
+          // These are not
+          lintingErrors.push(node2LintingError("Invalid mutation", path.node));
+        }
       }
     },
     TaggedTemplateExpression() {
