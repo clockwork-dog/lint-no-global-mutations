@@ -232,10 +232,12 @@ function getDeepFlags(
       });
       return flags;
     }
+    case "FunctionExpression":
+    case "ArrowFunctionExpression":
+      return flags;
     case "JSXElement":
     case "JSXFragment":
     case "ThisExpression":
-    case "FunctionExpression":
     case "UnaryExpression":
     case "UpdateExpression":
     case "BinaryExpression":
@@ -244,7 +246,6 @@ function getDeepFlags(
     case "ConditionalExpression":
     case "NewExpression":
     case "SequenceExpression":
-    case "ArrowFunctionExpression":
     case "YieldExpression":
     case "TemplateLiteral":
     case "TaggedTemplateExpression":

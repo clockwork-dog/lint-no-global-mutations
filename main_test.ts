@@ -165,6 +165,16 @@ Deno.test.ignore("allows a for loop", () => {
             }
             `);
 });
+Deno.test("allows function calls", () => {
+  testPasses(`
+              const anonArrow = () => {};
+              const anonFunc = function() {};
+              function namedFunc() {};
+              anonArrow();
+              anonFunc();
+              namedFunc();
+    `);
+});
 Deno.test("doesn't allow instance methods on globals", () => {
   testFails(`
     -->scenes.pop()<--;
