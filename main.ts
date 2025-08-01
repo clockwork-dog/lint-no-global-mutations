@@ -420,7 +420,6 @@ export function stopGlobalMutationLinter(
       if (callee.type === "Super") {
         return;
       }
-      const flags = getDeepFlags(callee, scopes);
       // Object prototype mutation with global as argument
       if (getDeepFlags(callee, scopes).isMutationFunction) {
         lintingErrors.push(node2LintingError("Invalid mutation", path.node));

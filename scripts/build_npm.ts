@@ -14,7 +14,7 @@ await build({
     // package.json properties
     name: "eslint-plugin-no-global-mutations",
     version: Deno.args[0],
-    description: "Your package.",
+    description: "ESLint No Global Mutations",
     license: "MIT",
     repository: {
       type: "git",
