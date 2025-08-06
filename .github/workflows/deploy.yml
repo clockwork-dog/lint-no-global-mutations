@@ -1,0 +1,34 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - "main"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 🦕 Setup deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.4
+
+      - name: 🏗️ Build playground
+        run: deno task build:playground
+
+      - name: 🌐 Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          name: github-pages
+          path: playground
+
+      - name: 🚀 Publish
+        uses: actions/deploy-pages@v4

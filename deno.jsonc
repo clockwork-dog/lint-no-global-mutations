@@ -1,0 +1,53 @@
+{
+    "version": "0.0.1",
+    "compilerOptions": {
+        "strict": true,
+        "noUncheckedIndexedAccess": true,
+        "lib": [
+            "deno.window",
+            "esnext",
+            "dom"
+        ]
+    },
+    "tasks": {
+        "build:playground": {
+            "command": "deno bundle --platform browser --output playground/index.js playground/index.ts",
+            "description": ""
+        },
+        "dev": {
+            "dependencies": [
+                "dev:serve",
+                "dev:bundle"
+            ]
+        },
+        "dev:serve": {
+            "command": "deno -ENR jsr:@std/http/file-server playground"
+        },
+        "dev:bundle": {
+            "command": "deno bundle --allow-import --watch --platform browser --output playground/index.js playground/index.ts"
+        }
+    },
+    "imports": {
+        "@codemirror/lang-javascript": "npm:@codemirror/lang-javascript@^6.2.4",
+        "@codemirror/language": "npm:@codemirror/language@^6.11.2",
+        "@codemirror/lint": "npm:@codemirror/lint@^6.8.5",
+        "@codemirror/state": "npm:@codemirror/state@^6.5.2",
+        "@codemirror/view": "npm:@codemirror/view@^6.38.1",
+        "@deno/dnt": "jsr:@deno/dnt@^0.42.3",
+        "@lezer/highlight": "npm:@lezer/highlight@^1.2.1",
+        "@types/espree": "npm:@types/espree@^10.1.0",
+        "codemirror": "npm:codemirror@^6.0.2",
+        "eslint": "npm:eslint@^9.32.0",
+        "espree": "npm:espree@^10.1.0",
+        "estree-toolkit": "npm:estree-toolkit@^1.7.13",
+        "@std/assert": "jsr:@std/assert@1"
+    },
+    "test": {
+        "exclude": [
+            "npm"
+        ]
+    },
+    "fmt": {
+        "indentWidth": 4
+    }
+}
