@@ -24,7 +24,7 @@ jobs:
       - name: 🌐 Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          name: github-pages
+          name: playground
           path: playground
 
   deploy:
@@ -40,3 +40,5 @@ jobs:
     steps:
       - name: 🚀 Publish
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: playground
