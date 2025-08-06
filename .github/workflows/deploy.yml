@@ -5,13 +5,10 @@ on:
     branches:
       - "main"
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 jobs:
-  run:
+  build:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,5 +27,16 @@ jobs:
           name: github-pages
           path: playground
 
+  deploy:
+    needs: build
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: 🚀 Publish
         uses: actions/deploy-pages@v4
