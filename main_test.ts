@@ -27,7 +27,7 @@ function testFails(programWithMarkers: string) {
   assertGreaterOrEqual(
     errors.length,
     1,
-    "Expected errors but there were none.",
+    "Expected errors but there were none."
   );
   errors.forEach((err) => {
     assertEquals(err.start, start);
@@ -127,9 +127,7 @@ Deno.test("Object.assign mutates global property", () => {
   testFails(`-->Object.assign(state, {key: "value"})<--;`);
 });
 Deno.test("Object.defineProperty mutates global property", () => {
-  testFails(
-    `-->Object.defineProperty(state, 'key', {value: 'value'})<--;`,
-  );
+  testFails(`-->Object.defineProperty(state, 'key', {value: 'value'})<--;`);
 });
 Deno.test("saves reference to mutating method", () => {
   testFails(`
@@ -186,9 +184,6 @@ Deno.test.ignore("array instance methods on user owned array", () => {
           const lastScene = allScenes.pop();
       `);
 });
-
-// These won't work, but are good documentation
-// eslint-disable-next-line jest/no-disabled-tests
 
 Deno.test.ignore("globalThis access", () => {
   testFails(`

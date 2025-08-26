@@ -12,18 +12,16 @@ await build({
   },
   package: {
     // package.json properties
-    name: "eslint-plugin-no-global-mutations",
+    name: "lint-no-global-mutations",
     version: Deno.args[0],
     description: "ESLint No Global Mutations",
     license: "MIT",
     repository: {
       type: "git",
-      url:
-        "git+https://github.com/clockwork-dog/eslint-plugin-no-global-mutations.git",
+      url: "git+https://github.com/clockwork-dog/lint-no-global-mutations.git",
     },
     bugs: {
-      url:
-        "https://github.com/clockwork-dog/eslint-plugin-no-global-mutations/issues",
+      url: "https://github.com/clockwork-dog/lint-no-global-mutations/issues",
     },
   },
   postBuild() {
