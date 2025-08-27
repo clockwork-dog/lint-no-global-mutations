@@ -110,13 +110,12 @@ const customLinter = (view: EditorView): Diagnostic[] => {
     try {
         const source = view.state.doc.toString();
         const ast = parse(source, { ecmaVersion: 2023 });
-        lint = stopGlobalMutationLinter(ast)
-            .map((e) => ({
-                from: e.start!,
-                to: e.end!,
-                message: e.message,
-                severity: "error",
-            }));
+        lint = stopGlobalMutationLinter(ast).map((e) => ({
+            from: e.start!,
+            to: e.end!,
+            message: e.message,
+            severity: "error",
+        }));
     } catch (e) {
         console.warn(e);
     }

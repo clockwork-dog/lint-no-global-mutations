@@ -343,24 +343,24 @@ export function stopGlobalMutationLinter(
          * Remember which local variables are in which scope
          */
         VariableDeclarator(path) {
-            if (path.node) {
-                const currentScope = scopes[scopes.length - 1];
-                switch (path.node.id.type) {
-                    case "Identifier": {
-                        const { id } = path.node;
-                        const init = path.node.init;
-                        if (currentScope) {
-                            currentScope[id.name] = getDeepFlags(init, scopes);
-                        }
-                        return;
-                    }
+            if (!path.node) return;
 
-                    case "MemberExpression":
-                    case "ObjectPattern":
-                    case "ArrayPattern":
-                    case "RestElement":
-                    case "AssignmentPattern":
+            const currentScope = scopes[scopes.length - 1];
+            switch (path.node.id.type) {
+                case "Identifier": {
+                    const { id } = path.node;
+                    const init = path.node.init;
+                    if (currentScope) {
+                        currentScope[id.name] = getDeepFlags(init, scopes);
+                    }
+                    return;
                 }
+
+                case "MemberExpression":
+                case "ObjectPattern":
+                case "ArrayPattern":
+                case "RestElement":
+                case "AssignmentPattern":
             }
         },
 
@@ -372,9 +372,7 @@ export function stopGlobalMutationLinter(
          *     Object.assign = () => {};
          */
         AssignmentExpression(path) {
-            if (!path.node) {
-                return;
-            }
+            if (!path.node) return;
 
             // Mutation check
             if (
@@ -418,9 +416,8 @@ export function stopGlobalMutationLinter(
             }
         },
         CallExpression(path) {
-            if (!path.node) {
-                return;
-            }
+            if (!path.node) return;
+
             const callee = path.node.callee;
             if (callee.type === "Super") {
                 return;
