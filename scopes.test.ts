@@ -1,6 +1,7 @@
 import { parse } from "espree";
 import { constructScopes } from "./scopes.ts";
 import { assertEquals } from "@std/assert/equals";
+import { expect } from "@std/expect";
 
 Deno.test("adds vars to scope", () => {
     const ast = parse("var a = 1", { ecmaVersion: 2023 });
@@ -9,10 +10,12 @@ Deno.test("adds vars to scope", () => {
 Deno.test("adds functions to scope", () => {
     const ast = parse("function a() { }", { ecmaVersion: 2023 });
     const allScopes = constructScopes(ast);
-    assertEquals(allScopes["-1"], [{ a: { start: 9, end: 10 } }]);
-    assertEquals(allScopes["13"], [
+    expect(allScopes["-1"]).toEqual([{
+        a: { start: 9, end: 10, functionBody: expect.any(Object) },
+    }]);
+    expect(allScopes["13"]).toEqual([
         {}, // Empty function body
-        { a: { start: 9, end: 10 } }, // Previous scope
+        { a: { start: 9, end: 10, functionBody: expect.any(Object) } }, // Previous scope
     ]);
 });
 Deno.test("doesn't add let to scope", () => {
@@ -46,15 +49,15 @@ Deno.test("nested block scopes", () => {
         { ecmaVersion: 2023 },
     );
     const allScopes = constructScopes(ast);
-    assertEquals(allScopes["-1"], [{}]);
-    assertEquals(allScopes["0"], [{
+    expect(allScopes["-1"]).toEqual([{}]);
+    expect(allScopes["0"]).toEqual([{
         a: { start: 18, end: 19 },
-        b: { start: 46, end: 47 },
+        b: { start: 46, end: 47, functionBody: expect.any(Object) },
     }, {}]);
-    assertEquals(allScopes["50"], [{
+    expect(allScopes["50"]).toEqual([{
         c: { start: 72, end: 73 },
     }, {
         a: { start: 18, end: 19 },
-        b: { start: 46, end: 47 },
+        b: { start: 46, end: 47, functionBody: expect.any(Object) },
     }, {}]);
 });

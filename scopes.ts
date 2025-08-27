@@ -1,18 +1,27 @@
 import { parse } from "espree";
-import { traverse } from "estree-toolkit";
+import { traverse, types } from "estree-toolkit";
+import { AssertionError } from "node:assert";
 
+export type Program = ReturnType<typeof parse>;
+export type FunctionNode = types.FunctionDeclaration;
 export type NodePos = {
     start: number;
     end: number;
+    functionBody?: FunctionNode;
 };
 export type Scope = {
     [ident: string]: NodePos;
 };
-const isNodePos = (node: any): node is NodePos => {
+function isNodePos(node: unknown): node is NodePos {
     return typeof node === "object" && node != null &&
         "start" in node && typeof node.start === "number" &&
         "end" in node && typeof node.end === "number";
-};
+}
+function assertIsNodePos(node: unknown): asserts node is NodePos {
+    if (!isNodePos(node)) {
+        throw new AssertionError();
+    }
+}
 
 export function constructScopes(
     program: ReturnType<typeof parse>,
@@ -26,9 +35,8 @@ export function constructScopes(
         BlockStatement: {
             enter(path) {
                 if (!path) return;
-                if (!isNodePos(path.node)) {
-                    throw new Error("Node does not have position");
-                }
+                assertIsNodePos(path.node);
+
                 currentScopeStack = [{}, ...currentScopeStack];
                 allScopeStacks[path.node.start] = currentScopeStack;
             },
@@ -48,9 +56,7 @@ export function constructScopes(
                 }
                 switch (declarator.id.type) {
                     case "Identifier": {
-                        if (!isNodePos(declarator.id)) {
-                            throw new Error("Node does not have position");
-                        }
+                        assertIsNodePos(declarator.id);
                         const { name, start, end } = declarator.id;
                         if (name in currentScopeStack[0]!) throw new Error("");
                         currentScopeStack[0]![name] = { start, end };
@@ -69,12 +75,10 @@ export function constructScopes(
         FunctionDeclaration(path) {
             if (!path?.node) return;
             const { node } = path;
-            if (!isNodePos(node.id)) {
-                throw new Error("Node does not have position");
-            }
+            assertIsNodePos(node.id);
             const { name, start, end } = node.id;
             if (name in currentScopeStack[0]!) throw new Error("");
-            currentScopeStack[0]![name] = { start, end };
+            currentScopeStack[0]![name] = { start, end, functionBody: node };
 
             currentScopeStack[0];
         },
