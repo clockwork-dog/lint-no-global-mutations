@@ -198,10 +198,23 @@ Deno.test.ignore("unknown array element mutation", () => {
             delete references[Math.floor(Math.random() * 2)].value;
             `);
 });
+
+Deno.test.ignore("non-mutating helper function", () => {
+    testPasses(`
+            const logItems = (...items) => console.log('[' + items.join(', ') + ']');
+            logItems(state);
+            `);
+});
 Deno.test.ignore("mutation helper function", () => {
     testFails(`
             const mutate = (arr) => arr.pop();
             mutate(state);
+        `);
+});
+Deno.test.ignore("hoisted mutation helper function", () => {
+    testPasses(`
+                mutate(state);
+                function mutate(arr) { arr.pop(); }
             `);
 });
 Deno.test.ignore("mutation helper tag", () => {
