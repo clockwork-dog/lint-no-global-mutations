@@ -156,10 +156,11 @@ Deno.test("doesn't allow nested dynamic referenced Object properties", () => {
 Deno.test.ignore("allows console.log()", () => {
   testPasses("console.log('Hello, world!')");
 });
-Deno.test.ignore("allows a for loop", () => {
+Deno.test("allows a for loop", () => {
   testPasses(`
+            const doSomething = () => {};
             for(let i = 0; i < 10; i++) {
-                console.log(i);
+                doSomething(i);
             }
             `);
 });
@@ -189,6 +190,26 @@ Deno.test.ignore("globalThis access", () => {
   testFails(`
             const o = globalThis['Obj' + 'ect'];
             o.assign(state, {key: value});
+            `);
+});
+Deno.test.ignore("unknown array element mutation", () => {
+    testFails(`
+            const references = [this, {value: 1}];
+            delete references[Math.floor(Math.random() * 2)].value;
+            `);
+});
+Deno.test.ignore("mutation helper function", () => {
+    testFails(`
+            const mutate = (arr) => arr.pop();
+            mutate(state);
+            `);
+});
+Deno.test.ignore("mutation helper tag", () => {
+    testFails(`
+            const mutate = (strings, ...args) => {
+                args[0].pop();
+            }
+            mutate\`\${state}\`;
             `);
 });
 Deno.test.ignore("eval", () => {
