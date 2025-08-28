@@ -7,7 +7,7 @@ Deno.test("adds vars to scope", () => {
     const ast = parse("var a = 1", { ecmaVersion: 2023 });
     assertEquals(constructScopes(ast)["-1"], [{ a: { start: 4, end: 5 } }]);
 });
-Deno.test("adds functions to scope", () => {
+Deno.test("adds functions declarations to scope", () => {
     const ast = parse("function a() { }", { ecmaVersion: 2023 });
     const allScopes = constructScopes(ast);
     expect(allScopes["-1"]).toEqual([{
@@ -17,6 +17,11 @@ Deno.test("adds functions to scope", () => {
         {}, // Empty function body
         { a: { start: 9, end: 10, functionBody: expect.any(Object) } }, // Previous scope
     ]);
+});
+Deno.test("doesn't add functions expressions to scope", () => {
+    const ast = parse("const a = function() { }", { ecmaVersion: 2023 });
+    const allScopes = constructScopes(ast);
+    expect(allScopes["-1"]).toEqual([{}]);
 });
 Deno.test("doesn't add let to scope", () => {
     const ast = parse("let a = 1", { ecmaVersion: 2023 });
