@@ -16,11 +16,11 @@ Deno.test("adds functions declarations to scope", () => {
     const program = ast("function a() { }");
     const allScopes = constructScopes(program);
     expect(allScopes["-1"]).toEqual([{
-        a: { start: 9, end: 10, functionBody: expect.any(Object) },
+        a: { start: 9, end: 10 },
     }]);
     expect(allScopes["13"]).toEqual([
         {}, // Empty function body
-        { a: { start: 9, end: 10, functionBody: expect.any(Object) } }, // Previous scope
+        { a: { start: 9, end: 10 } }, // Previous scope
     ]);
 });
 Deno.test("doesn't add functions expressions to scope", () => {
@@ -61,13 +61,13 @@ Deno.test("nested block scopes", () => {
     expect(allScopes["-1"]).toEqual([{}]);
     expect(allScopes["0"]).toEqual([{
         a: { start: 18, end: 19 },
-        b: { start: 46, end: 47, functionBody: expect.any(Object) },
+        b: { start: 46, end: 47 },
     }, {}]);
     expect(allScopes["50"]).toEqual([{
         c: { start: 72, end: 73 },
     }, {
         a: { start: 18, end: 19 },
-        b: { start: 46, end: 47, functionBody: expect.any(Object) },
+        b: { start: 46, end: 47 },
     }, {}]);
 });
 Deno.test.ignore("handles destructuring arrays", () => {

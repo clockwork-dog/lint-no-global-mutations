@@ -61,7 +61,7 @@ export function constructScopes(
             assertIsNodePos(node.id);
             const { name, start, end } = node.id;
             if (name in currentScopeStack[0]!) throw new Error("");
-            currentScopeStack[0]![name] = { start, end, functionBody: node };
+            currentScopeStack[0]![name] = { start, end };
 
             currentScopeStack[0];
         },
