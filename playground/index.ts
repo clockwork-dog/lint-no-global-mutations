@@ -5,6 +5,7 @@ import { Diagnostic, linter } from "@codemirror/lint";
 import { parse } from "espree";
 import { stopGlobalMutationLinter } from "../main.ts";
 import { tags as t } from "@lezer/highlight";
+import { ViewPlugin, ViewUpdate } from "@codemirror/view";
 
 export const EDITOR_COLORS = {
     background: "#1d2229",
@@ -101,9 +102,30 @@ export const cogsCodeMirrorSyntaxHighlightTheme = syntaxHighlighting(
     ]),
 );
 
-/**
- * Theme taken from
- */
+const syncURL = ViewPlugin.fromClass(
+    class {
+        constructor(view: EditorView) {
+            Promise.resolve()
+                .then(() => {
+                    const code = atob(globalThis.location.hash.slice(1));
+                    view.dispatch({
+                        changes: [{
+                            from: 0,
+                            insert: code,
+                        }],
+                    });
+                })
+                .catch(console.error);
+        }
+        update(update: ViewUpdate) {
+            if (update.docChanged) {
+                globalThis.location.hash = btoa(
+                    update.view.state.doc.toString(),
+                );
+            }
+        }
+    },
+);
 
 let lint: Diagnostic[] = [];
 const customLinter = (view: EditorView): Diagnostic[] => {
@@ -124,6 +146,7 @@ const customLinter = (view: EditorView): Diagnostic[] => {
 
 new EditorView({
     extensions: [
+        syncURL,
         basicSetup,
         javascript(),
         linter(customLinter),
