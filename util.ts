@@ -5,7 +5,6 @@ export type FunctionNode = types.FunctionDeclaration;
 export type NodePos = {
     start: number;
     end: number;
-    functionBody?: FunctionNode;
 };
 function isNodePos(node: unknown): node is NodePos {
     return typeof node === "object" && node != null &&
