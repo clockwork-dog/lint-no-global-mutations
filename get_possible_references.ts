@@ -39,6 +39,17 @@ export function getPossibleReferences(
                 ...getPossibleReferences(ex.consequent, referencesStack),
                 ...getPossibleReferences(ex.alternate, referencesStack),
             ];
+        case "AssignmentExpression":
+            // a = b = {}
+            // (a and b are the same reference)
+            return getPossibleReferences(ex.right, referencesStack);
+        case "UnaryExpression":
+            // Operators + - ! ~ typeof void delete
+            // These all return primitives
+            return [];
+        case "UpdateExpression":
+            // ++ -- return primitives
+            return [];
         case "ArrayExpression": {
             return [
                 ex.elements
@@ -123,23 +134,41 @@ export function getPossibleReferences(
             });
             return [object];
         }
+        case "MemberExpression": {
+            const possibleRefs: unknown[] = [];
+            if (ex.object.type === "Super") return [];
+
+            getPossibleReferences(ex.object, referencesStack).forEach((ref) => {
+                if (isNode(ref)) return;
+                if (Array.isArray(ref)) {
+                    possibleRefs.push(...ref);
+                } else if (typeof ref === "object" && ref !== null) {
+                    possibleRefs.push(...Object.values(ref));
+                }
+            });
+            return possibleRefs;
+        }
+        case "ChainExpression":
+            // Optional chaining
+            return getPossibleReferences(ex.expression, referencesStack);
+        case "SequenceExpression":
+            // const a = (b = 1, c = 2, d = 3)
+            // Returns the last expression
+            return getPossibleReferences(
+                ex.expressions[ex.expressions.length - 1]!,
+                referencesStack,
+            );
         case "ArrowFunctionExpression":
-        case "AssignmentExpression":
         case "AwaitExpression":
         case "CallExpression":
-        case "ChainExpression":
         case "ClassExpression":
         case "FunctionExpression":
         case "ImportExpression":
-        case "MemberExpression":
         case "MetaProperty":
         case "NewExpression":
-        case "SequenceExpression":
         case "TaggedTemplateExpression":
         case "TemplateLiteral":
         case "ThisExpression":
-        case "UnaryExpression":
-        case "UpdateExpression":
         case "YieldExpression":
         case "JSXElement":
         case "JSXFragment":

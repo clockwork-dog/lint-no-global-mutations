@@ -23,7 +23,7 @@ export function noMutation(
         // TODO: number lookup is gross
         hoistedRefs[start as any as number] = scopes.map((scope) => {
             const refs: References = {};
-            Object.entries(scope).forEach(([name, nPos]) => {
+            Object.entries(scope).forEach(([name]) => {
                 refs[name] = [];
             });
             return refs;
@@ -36,7 +36,7 @@ export function noMutation(
 
     const currentHoistedScope = hoistedScopes["-1"]![0]!;
     const currentHoistedRefs: References = {};
-    Object.entries(currentHoistedScope).forEach(([key, value]) => {
+    Object.entries(currentHoistedScope).forEach(([key]) => {
         currentHoistedRefs[key] = [];
     });
     let currentRefs: References[] = [currentHoistedRefs, globalRefs];
@@ -74,10 +74,13 @@ export function noMutation(
             assertIsNodePos(node);
 
             node.declarations.forEach((declaration) => {
-                const { init } = declaration;
+                const { id, init } = declaration;
+                if (id.type !== "Identifier") {
+                    throw new Error("TODO: Destructuring");
+                }
                 if (!init) return;
                 // Keep track of all the possibilities of the init
-                const possibleReferences = getPossibleReferences(
+                currentRefs[0]![id.name] = getPossibleReferences(
                     init,
                     currentRefs,
                 );

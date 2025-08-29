@@ -18,3 +18,21 @@ export function assertIsNodePos(node: unknown): asserts node is NodePos {
 }
 
 export const ANY_STRING = Symbol("any string");
+
+export class LintingError extends Error {
+    constructor(
+        msg: string,
+        public readonly start?: number,
+        public readonly end?: number,
+    ) {
+        super(msg);
+    }
+
+    static fromNode(msg: string, node: NodePos) {
+        return new LintingError(msg, node.start, node.end);
+    }
+
+    override get name() {
+        return this.constructor.name;
+    }
+}
