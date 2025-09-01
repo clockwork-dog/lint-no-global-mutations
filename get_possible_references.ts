@@ -1,19 +1,13 @@
 import { types } from "estree-toolkit";
-import { parse } from "espree";
 import { ANY_STRING } from "./util.ts";
 
 export type Reference = unknown | types.Node;
 export type References = Record<string, Reference[]>;
-
-const Node = parse("").constructor;
-function isNode(ref: unknown): ref is Node {
-    return ref instanceof Node;
-}
-
 export function getPossibleReferences(
-    ex: types.Expression | types.Super,
+    ex: types.Expression | types.Super | undefined,
     referencesStack: References[],
 ): Reference[] {
+    if (!ex) return [];
     switch (ex.type) {
         case "Literal":
             return [];
@@ -139,7 +133,6 @@ export function getPossibleReferences(
             if (ex.object.type === "Super") return [];
 
             getPossibleReferences(ex.object, referencesStack).forEach((ref) => {
-                if (isNode(ref)) return;
                 if (Array.isArray(ref)) {
                     possibleRefs.push(...ref);
                 } else if (typeof ref === "object" && ref !== null) {
@@ -158,11 +151,14 @@ export function getPossibleReferences(
                 ex.expressions[ex.expressions.length - 1]!,
                 referencesStack,
             );
+
+        // For functions we store the node to get access to params and body
+        case "FunctionExpression":
         case "ArrowFunctionExpression":
+            return [ex];
         case "AwaitExpression":
         case "CallExpression":
         case "ClassExpression":
-        case "FunctionExpression":
         case "ImportExpression":
         case "MetaProperty":
         case "NewExpression":

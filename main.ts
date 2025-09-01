@@ -1,6 +1,11 @@
 import { traverse, types } from "estree-toolkit";
 import { constructScopes } from "./scopes.ts";
-import { assertIsNodePos, LintingError } from "./util.ts";
+import {
+    assertIsFnNode,
+    assertIsNodePos,
+    FunctionNode,
+    LintingError,
+} from "./util.ts";
 import { assert } from "@std/assert";
 import { collectDeepReferences } from "./deep_references.ts";
 import {
@@ -42,7 +47,27 @@ export function noMutation(
     });
     let currentRefs: References[] = [currentHoistedRefs, globalRefs];
 
-    traverse(program, {
+    return noMutationRecursive(
+        program,
+        currentRefs,
+        hoistedRefs,
+        allSchemaRefs,
+    );
+}
+
+function noMutationRecursive(
+    code:
+        | types.Program
+        | types.FunctionDeclaration
+        | types.FunctionExpression
+        | types.ArrowFunctionExpression,
+    refsStack: References[],
+    hoistedRefs: Record<number, References[]>,
+    allSchemaRefs: Set<unknown>,
+) {
+    const errors: LintingError[] = [];
+    let currentRefs = refsStack;
+    traverse(code, {
         // We still need to keep track of non-hoisted variables (let / const)
         // So we just initialize each scope with hoisted variables
         BlockStatement: {
@@ -107,7 +132,7 @@ export function noMutation(
         },
 
         VariableDeclaration(path) {
-            const node = path?.node;
+            const node = path.node;
             assertIsNodePos(node);
 
             node.declarations.forEach((declaration) => {
@@ -129,6 +154,64 @@ export function noMutation(
                         throw new Error("TODO: Destructuring");
                 }
             });
+        },
+
+        FunctionDeclaration(path) {
+            // Function expressions and Arrow expressions are handled in variable declarations
+            const node = path.node;
+            assertIsNodePos(node);
+            currentRefs[0]![node.id.name] = [node];
+        },
+
+        CallExpression(path) {
+            const node = path.node;
+            assertIsNodePos(node);
+
+            const args = node.arguments.map((arg) => {
+                if (arg.type === "SpreadElement") {
+                    throw new Error("TODO: spread");
+                }
+                return getPossibleReferences(arg, currentRefs);
+            });
+
+            const possibleFns: FunctionNode[] = [];
+            switch (node.callee.type) {
+                case "Identifier":
+                    possibleFns.push(
+                        ...getPossibleReferences(
+                            node.callee,
+                            currentRefs,
+                        ) as FunctionNode[],
+                    );
+                    break;
+                case "FunctionExpression":
+                case "ArrowFunctionExpression":
+                    possibleFns.push(node.callee);
+            }
+
+            possibleFns.forEach(
+                (fnNode) => {
+                    assertIsFnNode(fnNode);
+                    const fnParams: References = {};
+                    fnNode.params.forEach((param, index) => {
+                        if (param.type !== "Identifier") {
+                            throw new Error("TODO");
+                        }
+                        fnParams[param.name] = args[index]!;
+                    });
+                    currentRefs = [fnParams, ...currentRefs];
+
+                    errors.push(
+                        ...noMutationRecursive(
+                            fnNode,
+                            currentRefs,
+                            hoistedRefs,
+                            allSchemaRefs,
+                        ),
+                    );
+                    currentRefs = currentRefs.slice(1);
+                },
+            );
         },
     });
     return errors;

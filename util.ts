@@ -1,7 +1,7 @@
 import { types } from "estree-toolkit";
 import { AssertionError } from "@std/assert";
+import { parse } from "espree";
 
-export type FunctionNode = types.FunctionDeclaration;
 export type NodePos = {
     start: number;
     end: number;
@@ -15,6 +15,29 @@ export function assertIsNodePos(node: unknown): asserts node is NodePos {
     if (!isNodePos(node)) {
         throw new AssertionError("");
     }
+}
+const Node = parse("").constructor;
+function isNode(ref: unknown): ref is types.Node {
+    return ref instanceof Node;
+}
+
+const functionTypes = new Set([
+    "FunctionDeclaration",
+    "FunctionExpression",
+    "ArrowFunctionExpression",
+]);
+export type FunctionNode =
+    | types.FunctionDeclaration
+    | types.FunctionExpression
+    | types.ArrowFunctionExpression;
+export function assertIsFnNode(
+    ref: unknown,
+): asserts ref is
+    & FunctionNode
+    & NodePos {
+    if (!isNode(ref)) throw new Error();
+    if (!isNodePos(ref)) throw new Error();
+    if (!functionTypes.has(ref.type)) throw new Error();
 }
 
 export const ANY_STRING = Symbol("any string");
