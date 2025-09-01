@@ -147,8 +147,8 @@ Deno.test("assign and update member", () => {
 });
 Deno.test.ignore("updates spread initialized variables", () => {
     testFails(`
-            let { ...spread } = state;
-            -->spread.key.values = 'value'<--;
+            let { ...spread } = globalNestedObj;
+            -->spread.a.b = 'value'<--;
             `);
 });
 Deno.test.ignore("updates indirected global property", () => {

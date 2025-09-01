@@ -88,14 +88,13 @@ export function noMutation(
                 throw new Error("TODO: Destructuring");
             }
 
-            const refs = node.left.type === "Identifier"
+            const possibleMutations = node.left.type === "Identifier"
                 ? getPossibleReferences(node.left, currentRefs)
                 : [
                     ...getPossibleReferences(node.left, currentRefs),
                     ...getPossibleReferences(node.left.object, currentRefs),
                 ];
-            // Have globals been mutated?
-            if (refs.some((ref) => allSchemaRefs.has(ref))) {
+            if (possibleMutations.some((ref) => allSchemaRefs.has(ref))) {
                 errors.push(
                     LintingError.fromNode(
                         "Cannot reassign global",
@@ -104,7 +103,7 @@ export function noMutation(
                 );
             }
 
-            // Update refs of other variables
+            // TODO:  Update refs of other variables
         },
 
         VariableDeclaration(path) {
@@ -113,15 +112,22 @@ export function noMutation(
 
             node.declarations.forEach((declaration) => {
                 const { id, init } = declaration;
-                if (id.type !== "Identifier") {
-                    throw new Error("TODO: Destructuring");
-                }
                 if (!init) return;
-                // Keep track of all the possibilities of the init
-                currentRefs[0]![id.name] = getPossibleReferences(
-                    init,
-                    currentRefs,
-                );
+                switch (id.type) {
+                    case "Identifier":
+                        // Keep track of all the possibilities of the init
+                        currentRefs[0]![id.name] = getPossibleReferences(
+                            init,
+                            currentRefs,
+                        );
+                        break;
+                    case "ObjectPattern":
+                    case "RestElement":
+                    case "MemberExpression":
+                    case "ArrayPattern":
+                    case "AssignmentPattern":
+                        throw new Error("TODO: Destructuring");
+                }
             });
         },
     });
