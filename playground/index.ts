@@ -3,9 +3,10 @@ import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { javascript } from "@codemirror/lang-javascript";
 import { Diagnostic, linter } from "@codemirror/lint";
 import { parse } from "espree";
-import { stopGlobalMutationLinter } from "../main.ts";
+import { noMutation } from "../main.ts";
 import { tags as t } from "@lezer/highlight";
 import { ViewPlugin, ViewUpdate } from "@codemirror/view";
+import { types } from "estree-toolkit";
 
 export const EDITOR_COLORS = {
     background: "#1d2229",
@@ -127,12 +128,17 @@ const syncURL = ViewPlugin.fromClass(
     },
 );
 
+const GLOBALS = {
+    globalObj: {},
+    globalArr: [],
+};
+
 let lint: Diagnostic[] = [];
 const customLinter = (view: EditorView): Diagnostic[] => {
     try {
         const source = view.state.doc.toString();
-        const ast = parse(source, { ecmaVersion: 2023 });
-        lint = stopGlobalMutationLinter(ast).map((e) => ({
+        const ast = parse(source, { ecmaVersion: 2023 }) as types.Program;
+        lint = noMutation(ast, GLOBALS).map((e) => ({
             from: e.start!,
             to: e.end!,
             message: e.message,

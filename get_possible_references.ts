@@ -11,7 +11,7 @@ function isNode(ref: unknown): ref is Node {
 }
 
 export function getPossibleReferences(
-    ex: types.Expression,
+    ex: types.Expression | types.Super,
     referencesStack: References[],
 ): Reference[] {
     switch (ex.type) {
@@ -172,6 +172,7 @@ export function getPossibleReferences(
         case "YieldExpression":
         case "JSXElement":
         case "JSXFragment":
+        case "Super":
             return [];
     }
 }

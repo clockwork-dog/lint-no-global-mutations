@@ -19,14 +19,14 @@ const parseEx = (ex: string) => {
 const REF_A = {};
 const REF_B = {};
 
-Deno.test("getPossibleReferences() literals don't have references", () => {
+Deno.test("literals don't have references", () => {
     assertEquals(getPossibleReferences(parseEx(`'a'`), []), []);
     assertEquals(getPossibleReferences(parseEx(`1`), []), []);
     assertEquals(getPossibleReferences(parseEx(`true`), []), []);
     assertEquals(getPossibleReferences(parseEx(`/a/`), []), []);
 });
 
-Deno.test("getPossibleReferences() finds identifier references", () => {
+Deno.test("finds identifier references", () => {
     const refs = getPossibleReferences(
         parseEx("a"),
         [{ a: [REF_A] }],
@@ -35,7 +35,7 @@ Deno.test("getPossibleReferences() finds identifier references", () => {
     assertStrictEquals(refs[0], REF_A);
 });
 
-Deno.test("getPossibleReferences() Logical expressions", () => {
+Deno.test("Logical expressions", () => {
     assertEquals(
         getPossibleReferences(
             parseEx(`a || b`),
@@ -59,7 +59,7 @@ Deno.test("getPossibleReferences() Logical expressions", () => {
     );
 });
 
-Deno.test("getPossibleReferences() Ternary expressions", () => {
+Deno.test("Ternary expressions", () => {
     assertEquals(
         getPossibleReferences(
             parseEx(`Math.random() > 0.5 ? a : b`),
@@ -69,7 +69,7 @@ Deno.test("getPossibleReferences() Ternary expressions", () => {
     );
 });
 
-Deno.test("getPossibleReferences() can handle arrays", () => {
+Deno.test("can handle arrays", () => {
     const referenceObj = {};
     const refs = getPossibleReferences(
         parseEx("[a]"),
@@ -79,7 +79,7 @@ Deno.test("getPossibleReferences() can handle arrays", () => {
     assertStrictEquals((refs[0] as any)[0], referenceObj);
 });
 
-Deno.test("getPossibleReferences() can handle array spread", () => {
+Deno.test("can handle array spread", () => {
     const refArrA = [REF_A];
     const refArrB = [REF_B];
     const refs = getPossibleReferences(
@@ -92,7 +92,7 @@ Deno.test("getPossibleReferences() can handle array spread", () => {
     assertStrictEquals((refs[0] as any)[1], REF_B);
 });
 
-Deno.test("getPossibleReferences() can handle simple objects", () => {
+Deno.test("can handle simple objects", () => {
     const refs = getPossibleReferences(
         parseEx("({key: a})"),
         [{ a: [REF_A] }],
@@ -102,7 +102,7 @@ Deno.test("getPossibleReferences() can handle simple objects", () => {
     assertStrictEquals((refs[0] as any).key[0], REF_A);
 });
 
-Deno.test("getPossibleReferences() can handle computed keys in objects", () => {
+Deno.test("can handle computed keys in objects", () => {
     const refs = getPossibleReferences(
         parseEx("({['k' + 'e' + 'y']: a})"),
         [{ a: [REF_A] }],
