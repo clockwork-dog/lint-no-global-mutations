@@ -138,14 +138,20 @@ Deno.test("mutation helper function", () => {
 Deno.test("mutation helper function on global", () => {
     testFails(`
         function increment(x) {
-            return -->x++<--;
+            return x++;
         }
-        increment(globalNestedObj);
+        -->increment(globalNestedObj)<--;
+        `);
+});
+Deno.test("mutation arrow function", () => {
+    testFails(`
+        const add = (x) => x++;
+        -->add(globalArr)<--;
         `);
 });
 Deno.test("mutation iife", () => {
     testFails(`
-        ((arr) => {-->arr++<--})(globalArr);
+        -->((arr) => {arr++})(globalArr)<--;
         `);
 });
 Deno.test("update global", () => {
@@ -264,10 +270,10 @@ Deno.test.ignore("non-mutating helper function", () => {
             logItems(state);
             `);
 });
-Deno.test.ignore("hoisted mutation helper function", () => {
+Deno.test("hoisted mutation helper function", () => {
     testPasses(`
                 mutate(state);
-                function mutate(arr) { arr.pop(); }
+                function mutate(arr) { arr++; }
             `);
 });
 Deno.test.ignore("mutation helper tag", () => {

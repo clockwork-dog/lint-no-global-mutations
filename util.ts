@@ -45,8 +45,8 @@ export const ANY_STRING = Symbol("any string");
 export class LintingError extends Error {
     constructor(
         msg: string,
-        public readonly start?: number,
-        public readonly end?: number,
+        public start: number,
+        public end: number,
     ) {
         super(msg);
     }

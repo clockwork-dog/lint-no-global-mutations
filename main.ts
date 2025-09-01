@@ -207,7 +207,11 @@ function noMutationRecursive(
                             currentRefs,
                             hoistedRefs,
                             allSchemaRefs,
-                        ),
+                        ).map((err) => {
+                            err.start = node.start;
+                            err.end = node.end;
+                            return err;
+                        }),
                     );
                     currentRefs = currentRefs.slice(1);
                 },
