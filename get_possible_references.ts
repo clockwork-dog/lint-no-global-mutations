@@ -136,7 +136,7 @@ export function getPossibleReferences(
                 if (Array.isArray(ref)) {
                     possibleRefs.push(...ref);
                 } else if (typeof ref === "object" && ref !== null) {
-                    possibleRefs.push(...Object.values(ref));
+                    possibleRefs.push(...Object.values(ref).flat());
                 }
             });
             return possibleRefs;

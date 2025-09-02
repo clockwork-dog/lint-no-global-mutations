@@ -7,7 +7,10 @@ import {
     LintingError,
 } from "./util.ts";
 import { assert } from "@std/assert";
-import { collectDeepReferences } from "./deep_references.ts";
+import {
+    objectToPossibleReferences,
+    PossibleObj,
+} from "./object_to_references.ts";
 import {
     getPossibleReferences,
     References,
@@ -17,41 +20,40 @@ export function noMutation(
     program: types.Program,
     schemaObj: any,
 ): LintingError[] {
-    const errors: LintingError[] = [];
-    const allSchemaRefs = collectDeepReferences(schemaObj);
-
     // Construct global scope
     // Get the current scope stack and attach empty reference arrays
     // These will be populated with possible global references later
     const hoistedScopes = constructScopes(program);
-    const hoistedRefs: Record<number, References[]> = {};
+    const hoistedRefs: Record<string | number, PossibleObj[]> = {};
     Object.entries(hoistedScopes).forEach(([start, scopes]) => {
         // TODO: number lookup is gross
-        hoistedRefs[start as any as number] = scopes.map((scope) => {
-            const refs: References = {};
+        hoistedRefs[start] = scopes.map((scope) => {
+            const refs: PossibleObj = {};
             Object.entries(scope).forEach(([name]) => {
                 refs[name] = [];
             });
             return refs;
         });
     });
-    const globalRefs: References = {};
-    Object.entries(schemaObj).forEach(([key, value]) => {
-        globalRefs[key] = [value];
-    });
+    const [[globalRefs], schemaMap] = objectToPossibleReferences(schemaObj);
+    if (typeof globalRefs !== "object" || Array.isArray(globalRefs)) {
+        throw new Error(
+            `schemaObj was not an object, got ${JSON.stringify(globalRefs)}`,
+        );
+    }
 
     const currentHoistedScope = hoistedScopes["-1"]![0]!;
-    const currentHoistedRefs: References = {};
+    const currentHoistedRefs: PossibleObj = {};
     Object.entries(currentHoistedScope).forEach(([key]) => {
         currentHoistedRefs[key] = [];
     });
-    let currentRefs: References[] = [currentHoistedRefs, globalRefs];
+    const currentRefs: PossibleObj[] = [currentHoistedRefs, globalRefs];
 
     return noMutationRecursive(
         program,
         currentRefs,
         hoistedRefs,
-        allSchemaRefs,
+        schemaMap,
     );
 }
 
@@ -63,7 +65,7 @@ function noMutationRecursive(
         | types.ArrowFunctionExpression,
     refsStack: References[],
     hoistedRefs: Record<number, References[]>,
-    allSchemaRefs: Set<unknown>,
+    allSchemaRefs: Map<any, unknown>,
 ) {
     const errors: LintingError[] = [];
     let currentRefs = refsStack;
@@ -176,7 +178,11 @@ function noMutationRecursive(
 
             const possibleFns: FunctionNode[] = [];
             switch (node.callee.type) {
-                case "Identifier":
+                case "FunctionExpression":
+                case "ArrowFunctionExpression":
+                    possibleFns.push(node.callee);
+                    break;
+                default:
                     possibleFns.push(
                         ...getPossibleReferences(
                             node.callee,
@@ -184,9 +190,6 @@ function noMutationRecursive(
                         ) as FunctionNode[],
                     );
                     break;
-                case "FunctionExpression":
-                case "ArrowFunctionExpression":
-                    possibleFns.push(node.callee);
             }
 
             possibleFns.forEach(

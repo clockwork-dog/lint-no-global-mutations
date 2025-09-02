@@ -102,6 +102,16 @@ Deno.test("can handle simple objects", () => {
     assertStrictEquals((refs[0] as any).key[0], REF_A);
 });
 
+Deno.test("can handle nested objects", () => {
+    const refs = getPossibleReferences(
+        parseEx("({ key: { arr: [a] } })"),
+        [{ a: [REF_A] }],
+    );
+
+    assertEquals(refs!.length, 1);
+    assertStrictEquals((refs[0] as any).key[0].arr[0][0], REF_A);
+});
+
 Deno.test("can handle computed keys in objects", () => {
     const refs = getPossibleReferences(
         parseEx("({['k' + 'e' + 'y']: a})"),

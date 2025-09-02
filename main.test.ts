@@ -5,8 +5,8 @@ import { types } from "estree-toolkit";
 
 function testPasses(program: string) {
     const globals = {
-        globalArr: [],
-        globalNestedArr: [[[]]],
+        globalArr: [0],
+        globalNestedArr: [1, [2, [3]]],
         globalObj: {},
         globalNestedObj: { a: { b: { c: {} } } },
     };
@@ -15,8 +15,8 @@ function testPasses(program: string) {
 }
 function testFails(programWithMarkers: string) {
     const globals = {
-        globalArr: [],
-        globalNestedArr: [[[]]],
+        globalArr: [0],
+        globalNestedArr: [1, [2, [3]]],
         globalObj: {},
         globalNestedObj: { a: { b: { c: {} } } },
     };
@@ -154,6 +154,13 @@ Deno.test("mutation iife", () => {
         -->((arr) => {arr++})(globalArr)<--;
         `);
 });
+Deno.test("mutation from object member", () => {
+    testFails(`
+        const o = { f: function mutate(x) { x++; } };
+        -->o.f(globalArr)<--;
+        `);
+});
+
 Deno.test("update global", () => {
     testFails("-->globalObj = 2<--;");
 });
@@ -176,6 +183,11 @@ Deno.test.ignore("updates spread initialized variables", () => {
     testFails(`
             let { ...spread } = globalNestedObj;
             -->spread.a.b = 'value'<--;
+            `);
+});
+Deno.test("adding a key to a nested global", () => {
+    testFails(`
+            -->globalNestedObj.a.key = 'value'<--;
             `);
 });
 Deno.test.ignore("updates indirected global property", () => {
@@ -244,7 +256,7 @@ Deno.test.ignore("doesn't allow instance methods on globals", () => {
     -->globalArr.pop()<--;
     `);
 });
-Deno.test.ignore("array instance methods on user owned array", () => {
+Deno.test("array instance methods on user owned array", () => {
     testPasses(`
           const allScenes = [...scenes];
           const lastScene = allScenes.pop();

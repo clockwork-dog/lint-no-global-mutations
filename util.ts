@@ -35,7 +35,7 @@ export function assertIsFnNode(
 ): asserts ref is
     & FunctionNode
     & NodePos {
-    if (!isNode(ref)) throw new Error();
+    if (!isNode(ref)) throw new Error(JSON.stringify(ref));
     if (!isNodePos(ref)) throw new Error();
     if (!functionTypes.has(ref.type)) throw new Error();
 }
