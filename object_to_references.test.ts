@@ -11,6 +11,18 @@ Deno.test("values are wrapped in an array", () => {
     assertEquals(objectToPossibleReferences({})[0], [{}]);
 });
 
+Deno.test("functions references are kept", () => {
+    const fn = () => {};
+    const [refs] = objectToPossibleReferences(fn);
+    assertStrictEquals(refs[0], fn);
+});
+
+Deno.test("Dates references are kept", () => {
+    const d = Date;
+    const [refs] = objectToPossibleReferences(d);
+    assertStrictEquals(refs[0], d);
+});
+
 Deno.test("arrays keep possible elements", () => {
     const [refs] = objectToPossibleReferences([1, 2, 3]);
     assertEquals(refs, [[1, 2, 3]]);

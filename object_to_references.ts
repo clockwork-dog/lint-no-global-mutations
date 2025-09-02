@@ -1,24 +1,27 @@
 import { ANY_STRING } from "./util.ts";
 
-export type Primitive = boolean | number | string;
-export type PossiblePrimitive = Array<Primitive>;
+export type Value = boolean | number | string;
+export type PossibleValue = Array<Value>;
 export type PossibleObj = {
     [key: string]: Array<
-        Primitive | PossibleArray | PossibleObj
+        Value | PossibleArray | PossibleObj
     >;
 } & {
     [ANY_STRING]?: Array<
-        Primitive | PossibleArray | PossibleObj
+        Value | PossibleArray | PossibleObj
     >;
 };
 
-export type PossibleArray = Array<Primitive | PossibleObj | PossibleArray>;
+export type PossibleArray = Array<Value | PossibleObj | PossibleArray>;
 
-const isPrimitive = (x: unknown): x is Primitive => {
+const isValue = (x: unknown): x is Value => {
     switch (typeof x) {
         case "boolean":
         case "number":
         case "string":
+        case "bigint":
+        case "symbol":
+        case "function":
             return true;
         default:
             return false;
@@ -29,7 +32,7 @@ export function objectToPossibleReferences(
     x: unknown,
     map: ReferenceMap = new Map(),
 ): [PossibleArray, ReferenceMap] {
-    if (isPrimitive(x)) {
+    if (isValue(x)) {
         return [[x], map];
     }
 
@@ -58,5 +61,5 @@ export function objectToPossibleReferences(
         return [[mappedObj], map];
     }
 
-    throw new Error();
+    throw new Error(`Unknown type ${x}`);
 }
