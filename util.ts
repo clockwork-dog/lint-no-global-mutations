@@ -1,5 +1,4 @@
 import { types } from "estree-toolkit";
-import { AssertionError } from "@std/assert";
 import { parse } from "espree";
 
 export type NodePos = {
@@ -13,7 +12,7 @@ function isNodePos(node: unknown): node is NodePos {
 }
 export function assertIsNodePos(node: unknown): asserts node is NodePos {
     if (!isNodePos(node)) {
-        throw new AssertionError("");
+        throw new Error("");
     }
 }
 const Node = parse("").constructor;
