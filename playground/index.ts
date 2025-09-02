@@ -1,12 +1,9 @@
 import { basicSetup, EditorView } from "codemirror";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { javascript } from "@codemirror/lang-javascript";
-import { Diagnostic, linter } from "@codemirror/lint";
-import { parse } from "espree";
-import { noMutation } from "../main.ts";
 import { tags as t } from "@lezer/highlight";
 import { ViewPlugin, ViewUpdate } from "@codemirror/view";
-import { types } from "estree-toolkit";
+import { NoGlobalMutations } from "../linter.ts";
 
 export const EDITOR_COLORS = {
     background: "#1d2229",
@@ -131,31 +128,17 @@ const syncURL = ViewPlugin.fromClass(
 const GLOBALS = {
     globalObj: {},
     globalArr: [],
+    window: { key: "value" },
 };
 
-let lint: Diagnostic[] = [];
-const customLinter = (view: EditorView): Diagnostic[] => {
-    try {
-        const source = view.state.doc.toString();
-        const ast = parse(source, { ecmaVersion: 2023 }) as types.Program;
-        lint = noMutation(ast, GLOBALS).map((e) => ({
-            from: e.start!,
-            to: e.end!,
-            message: e.message,
-            severity: "error",
-        }));
-    } catch (e) {
-        console.warn(e);
-    }
-    return lint;
-};
+const noMutation = new NoGlobalMutations(GLOBALS);
 
 new EditorView({
     extensions: [
         syncURL,
         basicSetup,
         javascript(),
-        linter(customLinter),
+        noMutation.linter,
         cogsCodeMirrorEditorTheme,
         cogsCodeMirrorSyntaxHighlightTheme,
     ],

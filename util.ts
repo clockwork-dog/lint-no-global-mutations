@@ -30,14 +30,18 @@ export type FunctionNode =
     | types.FunctionDeclaration
     | types.FunctionExpression
     | types.ArrowFunctionExpression;
+export function isFnNode(ref: unknown): ref is FunctionNode & NodePos {
+    if (!isNode(ref)) return false;
+    if (!isNodePos(ref)) return false;
+    if (!functionTypes.has(ref.type)) return false;
+    return true;
+}
 export function assertIsFnNode(
     ref: unknown,
 ): asserts ref is
     & FunctionNode
     & NodePos {
-    if (!isNode(ref)) throw new Error(JSON.stringify(ref));
-    if (!isNodePos(ref)) throw new Error();
-    if (!functionTypes.has(ref.type)) throw new Error();
+    if (!isFnNode(ref)) throw new Error();
 }
 
 export const ANY_STRING = Symbol("any string");

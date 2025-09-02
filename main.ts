@@ -4,6 +4,7 @@ import {
     assertIsFnNode,
     assertIsNodePos,
     FunctionNode,
+    isFnNode,
     LintingError,
 } from "./util.ts";
 import { assert } from "@std/assert";
@@ -194,6 +195,10 @@ function noMutationRecursive(
 
             possibleFns.forEach(
                 (fnNode) => {
+                    if (!isFnNode(fnNode)) {
+                        return;
+                    }
+
                     assertIsFnNode(fnNode);
                     const fnParams: References = {};
                     fnNode.params.forEach((param, index) => {

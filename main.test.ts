@@ -5,6 +5,7 @@ import { types } from "estree-toolkit";
 
 function testPasses(program: string) {
     const globals = {
+        window: { key: "value" },
         globalArr: [0],
         globalNestedArr: [1, [2, [3]]],
         globalObj: {},
@@ -15,6 +16,7 @@ function testPasses(program: string) {
 }
 function testFails(programWithMarkers: string) {
     const globals = {
+        window: { key: "value" },
         globalArr: [0],
         globalNestedArr: [1, [2, [3]]],
         globalObj: {},
@@ -298,4 +300,20 @@ Deno.test.ignore("mutation helper tag", () => {
 });
 Deno.test.ignore("eval", () => {
     testFails(`eval("state.key = 'value';");`);
+});
+Deno.test.ignore("recursive function", () => {
+    testPasses(`
+        function multiply(x, y) {
+            if (y === 0) return 0;
+            return x + multiply(x, y - 1);
+        }
+        multiply(2, 3);
+        `);
+});
+Deno.test("Example usage", () => {
+    testFails(`
+        window.addEventListener(() => {
+            -->window.key = 'new value'<--;            
+        })
+        `);
 });
