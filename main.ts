@@ -6,7 +6,7 @@ import {
     FunctionNode,
     isFnNode,
     LintingError,
-    NON_MUTATING_ARRAY_INSTANCE_METHODS,
+    NON_MUTATING_ARRAY_INSTANCE_METHOD_NAMES,
 } from "./util.ts";
 import { assert } from "@std/assert";
 import {
@@ -97,10 +97,31 @@ function noMutationRecursive(
             ) {
                 errors.push(
                     LintingError.fromNode(
-                        "Cannot update global variable",
+                        "Cannot mutate global variable",
                         node,
                     ),
                 );
+            }
+        },
+
+        UnaryExpression(path) {
+            const node = path.node;
+            assertIsNodePos(node);
+            if (node.operator === "delete") {
+                console.log(node.argument);
+                console.log(getPossibleReferences(node.argument, currentRefs));
+
+                if (
+                    getPossibleReferences(node.argument, currentRefs)
+                        .some((ref) => allSchemaRefs.has(ref))
+                ) {
+                    errors.push(
+                        LintingError.fromNode(
+                            "Cannot mutate global variable",
+                            node,
+                        ),
+                    );
+                }
             }
         },
 
@@ -180,7 +201,7 @@ function noMutationRecursive(
                     .filter(() => {
                         if (
                             property.type === "Identifier" &&
-                            NON_MUTATING_ARRAY_INSTANCE_METHODS.has(
+                            NON_MUTATING_ARRAY_INSTANCE_METHOD_NAMES.has(
                                 property.name,
                             )
                         ) {
@@ -188,7 +209,7 @@ function noMutationRecursive(
                         }
                         if (
                             property.type === "Literal" &&
-                            NON_MUTATING_ARRAY_INSTANCE_METHODS.has(
+                            NON_MUTATING_ARRAY_INSTANCE_METHOD_NAMES.has(
                                 property.value as any,
                             )
                         ) {
@@ -202,6 +223,8 @@ function noMutationRecursive(
                         );
                     });
             }
+
+            // Check for Object prototype methods
 
             // Check for user functions
             const args = node.arguments.map((arg) => {

@@ -1,7 +1,12 @@
 import { getPossibleReferences } from "./get_possible_references.ts";
 import { parse } from "espree";
 import { types } from "estree-toolkit";
-import { assertEquals, assertStrictEquals } from "@std/assert";
+import {
+    assertArrayIncludes,
+    assertEquals,
+    assertGreater,
+    assertStrictEquals,
+} from "@std/assert";
 import { ANY_STRING } from "./util.ts";
 
 const parseEx = (ex: string) => {
@@ -120,4 +125,27 @@ Deno.test("can handle computed keys in objects", () => {
 
     assertEquals(refs!.length, 1);
     assertStrictEquals((refs[0] as any)[ANY_STRING][0], REF_A);
+});
+
+Deno.test("preserves Object reference", () => {
+    const refs = getPossibleReferences(parseEx("Object"), []);
+    assertStrictEquals(refs[0], Object);
+});
+
+Deno.test("preserves Object member reference", () => {
+    const refs = getPossibleReferences(parseEx("Object.assign"), []);
+    assertStrictEquals(refs[0], Object.assign);
+});
+
+Deno.test("complex index falls back to all properties", () => {
+    const refs = getPossibleReferences(parseEx("Object['as' + 'sign']"), []);
+    assertGreater(refs.length, 1);
+    assertArrayIncludes(refs, [Object.assign]);
+});
+
+Deno.test.ignore("gets deep properties", () => {
+    const refs = getPossibleReferences(parseEx("globalNestedObj.a"), [{
+        globalNestedObj: [{ a: [{ b: [{ c: [{}] }] }] }],
+    }]);
+    assertEquals(refs, [{ b: [{ c: [{}] }] }]);
 });

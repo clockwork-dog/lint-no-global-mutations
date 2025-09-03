@@ -63,7 +63,7 @@ export class LintingError extends Error {
     }
 }
 
-export const NON_MUTATING_ARRAY_INSTANCE_METHODS = new Set([
+export const NON_MUTATING_ARRAY_INSTANCE_METHOD_NAMES = new Set([
     "at",
     "concat",
     // "copyWithin",

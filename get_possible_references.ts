@@ -17,7 +17,14 @@ export function getPossibleReferences(
                     return references[ex.name]!;
                 }
             }
-            return [];
+            switch (ex.name) {
+                case "Object":
+                    return [Object];
+                case "Array":
+                    return [Array];
+                default:
+                    return [];
+            }
         case "BinaryExpression":
             // Must return a primitive
             return [];
@@ -132,11 +139,31 @@ export function getPossibleReferences(
             const possibleRefs: unknown[] = [];
             if (ex.object.type === "Super") return [];
 
+            const p = ex.property.type === "Identifier"
+                ? ex.property.name
+                : ex.property.type === "Literal"
+                ? ex.property.value
+                : ANY_STRING;
+
             getPossibleReferences(ex.object, referencesStack).forEach((ref) => {
                 if (Array.isArray(ref)) {
                     possibleRefs.push(...ref);
-                } else if (typeof ref === "object" && ref !== null) {
-                    possibleRefs.push(...Object.values(ref).flat());
+                } else if (ref instanceof Object && ref !== null) {
+                    //@ts-ignore This is as we check `in`
+                    if (p in ref) {
+                        //@ts-ignore So p must be index type
+                        possibleRefs.push(ref[p]);
+                    } else {
+                        const allProperties = Object
+                            .getOwnPropertyNames(ref) as Array<
+                                keyof typeof ref
+                            >;
+                        for (const property of allProperties) {
+                            possibleRefs.push(ref[property]);
+                        }
+
+                        possibleRefs.push(...Object.values(ref).flat());
+                    }
                 }
             });
             return possibleRefs;
