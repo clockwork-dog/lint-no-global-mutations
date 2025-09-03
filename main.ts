@@ -6,6 +6,7 @@ import {
     FunctionNode,
     isFnNode,
     LintingError,
+    NON_MUTATING_ARRAY_INSTANCE_METHODS,
 } from "./util.ts";
 import { assert } from "@std/assert";
 import {
@@ -170,6 +171,39 @@ function noMutationRecursive(
             const node = path.node;
             assertIsNodePos(node);
 
+            // Check for Array instance methods
+            if (node.callee.type === "MemberExpression") {
+                const { object, property } = node.callee;
+                getPossibleReferences(object, currentRefs)
+                    .filter((arr) => allSchemaRefs.has(arr))
+                    .filter(Array.isArray)
+                    .filter(() => {
+                        if (
+                            property.type === "Identifier" &&
+                            NON_MUTATING_ARRAY_INSTANCE_METHODS.has(
+                                property.name,
+                            )
+                        ) {
+                            return false;
+                        }
+                        if (
+                            property.type === "Literal" &&
+                            NON_MUTATING_ARRAY_INSTANCE_METHODS.has(
+                                property.value as any,
+                            )
+                        ) {
+                            return false;
+                        }
+                        return true;
+                    })
+                    .forEach(() => {
+                        errors.push(
+                            LintingError.fromNode(`Array mutation`, node),
+                        );
+                    });
+            }
+
+            // Check for user functions
             const args = node.arguments.map((arg) => {
                 if (arg.type === "SpreadElement") {
                     throw new Error("TODO: spread");

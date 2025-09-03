@@ -253,7 +253,13 @@ Deno.test("allows function calls", () => {
               namedFunc();
     `);
 });
-Deno.test.ignore("doesn't allow instance methods on globals", () => {
+Deno.test("allows pure instance methods on globals (identifier)", () => {
+    testPasses(`globalArr.slice();`);
+});
+Deno.test("allows pure instance methods on globals (literal)", () => {
+    testPasses(`globalArr['at'](0);`);
+});
+Deno.test("doesn't allow mutating instance methods on globals", () => {
     testFails(`
     -->globalArr.pop()<--;
     `);
