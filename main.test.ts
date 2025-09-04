@@ -329,3 +329,16 @@ Deno.test("Example usage", () => {
         })
         `);
 });
+Deno.test.ignore("Calling binded Object prototype methods", () => {
+    testFails(`
+        const mutate = Object.prototype.constructor.assign;
+        -->mutate(globalObj, {a: 1})<--;
+        ;
+        `);
+});
+Deno.test.ignore("Tagged template binded Object prototype methods", () => {
+    testFails(`
+        const pop = Object.getPrototypeOf([]).pop.bind(globalArr);
+        -->pop\`aah\`<--;
+        `);
+});
