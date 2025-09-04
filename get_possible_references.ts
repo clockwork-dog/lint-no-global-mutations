@@ -1,16 +1,17 @@
 import { types } from "estree-toolkit";
 import { ANY_STRING } from "./util.ts";
+import { Reference } from "./reference.ts";
 
-export type Reference = unknown | types.Node;
-export type References = Record<string, Reference[]>;
+export type ReferenceStack = Record<string, Reference>[];
+
 export function getPossibleReferences(
     ex: types.Expression | types.Super | undefined,
-    referencesStack: References[],
-): Reference[] {
-    if (!ex) return [];
+    referencesStack: ReferenceStack,
+): Reference {
+    if (!ex) return new Reference();
     switch (ex.type) {
         case "Literal":
-            return [];
+            return new Reference([ex.value]);
         case "Identifier":
             for (const references of referencesStack) {
                 if (ex.name in references) {
@@ -19,27 +20,31 @@ export function getPossibleReferences(
             }
             switch (ex.name) {
                 case "Object":
-                    return [Object];
+                    return new Reference([Object]);
                 case "Array":
-                    return [Array];
+                    return new Reference([Array]);
                 default:
-                    return [];
+                    return new Reference();
             }
         case "BinaryExpression":
             // Must return a primitive
-            return [];
+            return new Reference([true, false]);
         case "LogicalExpression":
             // ||, &&, ??
-            return [
-                ...getPossibleReferences(ex.left, referencesStack),
-                ...getPossibleReferences(ex.right, referencesStack),
-            ];
+            return new Reference([
+                ...getPossibleReferences(ex.left, referencesStack)
+                    .unwrap(),
+                ...getPossibleReferences(ex.right, referencesStack)
+                    .unwrap(),
+            ]);
         case "ConditionalExpression":
             // condition ? a : b
-            return [
-                ...getPossibleReferences(ex.consequent, referencesStack),
-                ...getPossibleReferences(ex.alternate, referencesStack),
-            ];
+            return new Reference([
+                ...getPossibleReferences(ex.consequent, referencesStack)
+                    .unwrap(),
+                ...getPossibleReferences(ex.alternate, referencesStack)
+                    .unwrap(),
+            ]);
         case "AssignmentExpression":
             // a = b = {}
             // (a and b are the same reference)
@@ -47,33 +52,38 @@ export function getPossibleReferences(
         case "UnaryExpression":
             // Operators + - ! ~ typeof void delete
             // These all return primitives
-            return [];
+            return new Reference();
         case "UpdateExpression":
             // ++ -- return primitives
-            return [];
+            return new Reference();
         case "ArrayExpression": {
-            return [
-                ex.elements
-                    .filter((elem) => elem !== null)
-                    .flatMap((elem) => {
-                        if (elem.type === "SpreadElement") {
-                            return getPossibleReferences(
-                                elem.argument,
-                                referencesStack,
-                            )
-                                .filter(Array.isArray)
-                                .flatMap((arr) => arr);
-                        } else {
-                            return getPossibleReferences(elem, referencesStack);
-                        }
-                    }),
-            ];
+            // TODO: Check this!
+            const elements: unknown[] = [];
+            ex.elements
+                .filter((elem) => elem !== null)
+                .forEach((elem) => {
+                    if (elem?.type === "SpreadElement") {
+                        getPossibleReferences(elem.argument, referencesStack)
+                            .unwrap()
+                            .filter(Array.isArray)
+                            .forEach((arr) => {
+                                arr.forEach((item) => {
+                                    elements.push(item);
+                                });
+                            });
+                    } else {
+                        getPossibleReferences(elem, referencesStack)
+                            .unwrap()
+                            .forEach((p) => elements.push(p));
+                    }
+                });
+            return new Reference([elements]);
         }
         case "ObjectExpression": {
-            const object: Record<string | symbol, unknown[]> = {};
+            const object: Record<string | symbol, Reference> = {};
             ex.properties.forEach((property) => {
                 if (property.type === "SpreadElement") {
-                    //
+                    throw new Error("TODO: Spread");
                 } else {
                     const { key, value } = property;
                     if (value.type === "ObjectPattern") return;
@@ -83,19 +93,17 @@ export function getPossibleReferences(
 
                     switch (key.type) {
                         case "Identifier":
-                            object[key.name] ??= [];
-                            object[key.name]?.push(...getPossibleReferences(
+                            object[key.name] = getPossibleReferences(
                                 value,
                                 referencesStack,
-                            ));
+                            );
                             break;
                         case "Literal":
                             if (key.raw === undefined) return;
-                            object[key.raw] ??= [];
-                            object[key.raw]?.push(...getPossibleReferences(
+                            object[key.raw] = getPossibleReferences(
                                 value,
                                 referencesStack,
-                            ));
+                            );
                             break;
                         case "PrivateIdentifier":
                         case "JSXElement":
@@ -123,21 +131,18 @@ export function getPossibleReferences(
                         case "UnaryExpression":
                         case "UpdateExpression":
                         case "YieldExpression":
-                            object[ANY_STRING] ??= [];
-                            object[ANY_STRING].push(
-                                ...getPossibleReferences(
-                                    value,
-                                    referencesStack,
-                                ),
+                            object[ANY_STRING] = getPossibleReferences(
+                                value,
+                                referencesStack,
                             );
                     }
                 }
             });
-            return [object];
+            return new Reference([object]);
         }
         case "MemberExpression": {
+            if (ex.object.type === "Super") return new Reference();
             const possibleRefs: unknown[] = [];
-            if (ex.object.type === "Super") return [];
 
             const p = ex.property.type === "Identifier"
                 ? ex.property.name
@@ -145,28 +150,30 @@ export function getPossibleReferences(
                 ? ex.property.value
                 : ANY_STRING;
 
-            getPossibleReferences(ex.object, referencesStack).forEach((ref) => {
-                if (Array.isArray(ref)) {
-                    possibleRefs.push(...ref);
-                } else if (ref instanceof Object && ref !== null) {
-                    //@ts-ignore This is as we check `in`
-                    if (p in ref) {
-                        //@ts-ignore So p must be index type
-                        possibleRefs.push(ref[p]);
-                    } else {
-                        const allProperties = Object
-                            .getOwnPropertyNames(ref) as Array<
-                                keyof typeof ref
-                            >;
-                        for (const property of allProperties) {
-                            possibleRefs.push(ref[property]);
-                        }
+            getPossibleReferences(ex.object, referencesStack)
+                .unwrap()
+                .forEach((ref) => {
+                    if (Array.isArray(ref)) {
+                        possibleRefs.push(...ref);
+                    } else if (ref instanceof Object && ref !== null) {
+                        //@ts-ignore This is as we check `in`
+                        if (p in ref) {
+                            //@ts-ignore So p must be index type
+                            possibleRefs.push(ref[p]);
+                        } else {
+                            const allProperties = Object
+                                .getOwnPropertyNames(ref) as Array<
+                                    keyof typeof ref
+                                >;
+                            for (const property of allProperties) {
+                                possibleRefs.push(ref[property]);
+                            }
 
-                        possibleRefs.push(...Object.values(ref).flat());
+                            possibleRefs.push(...Object.values(ref).flat());
+                        }
                     }
-                }
-            });
-            return possibleRefs;
+                });
+            return new Reference(possibleRefs);
         }
         case "ChainExpression":
             // Optional chaining
@@ -182,7 +189,7 @@ export function getPossibleReferences(
         // For functions we store the node to get access to params and body
         case "FunctionExpression":
         case "ArrowFunctionExpression":
-            return [ex];
+            return new Reference([ex]);
         case "AwaitExpression":
         case "CallExpression":
         case "ClassExpression":
@@ -196,6 +203,6 @@ export function getPossibleReferences(
         case "JSXElement":
         case "JSXFragment":
         case "Super":
-            return [];
+            return new Reference([]);
     }
 }

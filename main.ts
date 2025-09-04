@@ -10,52 +10,55 @@ import {
 } from "./util.ts";
 import { assert } from "@std/assert";
 import {
-    objectToPossibleReferences,
-    PossibleObj,
-} from "./object_to_references.ts";
-import {
     getPossibleReferences,
-    References,
+    ReferenceStack,
 } from "./get_possible_references.ts";
+import { Reference } from "./reference.ts";
+import { collectDeepReferences } from "./deep_references.ts";
 
 export function noMutation(
     program: types.Program,
     schemaObj: any,
 ): LintingError[] {
+    const allSchemaRefs = collectDeepReferences(schemaObj);
     // Construct global scope
     // Get the current scope stack and attach empty reference arrays
     // These will be populated with possible global references later
     const hoistedScopes = constructScopes(program);
-    const hoistedRefs: Record<string | number, PossibleObj[]> = {};
+    const hoistedRefs: Record<string | number, ReferenceStack> = {};
     Object.entries(hoistedScopes).forEach(([start, scopes]) => {
         // TODO: number lookup is gross
         hoistedRefs[start] = scopes.map((scope) => {
-            const refs: PossibleObj = {};
-            Object.entries(scope).forEach(([name]) => {
-                refs[name] = [];
+            const refs: Record<string, Reference> = {};
+            Object.entries(scope).forEach(([name, value]) => {
+                refs[name] = new Reference([value]);
             });
             return refs;
         });
     });
-    const [[globalRefs], schemaMap] = objectToPossibleReferences(schemaObj);
-    if (typeof globalRefs !== "object" || Array.isArray(globalRefs)) {
+
+    if (typeof schemaObj !== "object" || Array.isArray(schemaObj)) {
         throw new Error(
-            `schemaObj was not an object, got ${JSON.stringify(globalRefs)}`,
+            `schemaObj was not an object, got ${JSON.stringify(schemaObj)}`,
         );
     }
+    const globalRefs: ReferenceStack[number] = {};
+    Object.entries(schemaObj).forEach(([key, value]) => {
+        globalRefs[key] = new Reference([value]);
+    });
 
     const currentHoistedScope = hoistedScopes["-1"]![0]!;
-    const currentHoistedRefs: PossibleObj = {};
+    const currentHoistedRefs: ReferenceStack[number] = {};
     Object.entries(currentHoistedScope).forEach(([key]) => {
-        currentHoistedRefs[key] = [];
+        currentHoistedRefs[key] = new Reference();
     });
-    const currentRefs: PossibleObj[] = [currentHoistedRefs, globalRefs];
+    const currentRefs: ReferenceStack = [currentHoistedRefs, globalRefs];
 
     return noMutationRecursive(
         program,
         currentRefs,
         hoistedRefs,
-        schemaMap,
+        allSchemaRefs,
     );
 }
 
@@ -65,9 +68,9 @@ function noMutationRecursive(
         | types.FunctionDeclaration
         | types.FunctionExpression
         | types.ArrowFunctionExpression,
-    refsStack: References[],
-    hoistedRefs: Record<number, References[]>,
-    allSchemaRefs: Map<any, unknown>,
+    refsStack: ReferenceStack,
+    hoistedRefs: Record<number, ReferenceStack>,
+    allSchemaRefs: Set<unknown>,
 ) {
     const errors: LintingError[] = [];
     let currentRefs = refsStack;
@@ -91,9 +94,9 @@ function noMutationRecursive(
             const node = path?.node;
             assertIsNodePos(node);
             if (
-                getPossibleReferences(node.argument, currentRefs).some(
-                    (ref) => allSchemaRefs.has(ref),
-                )
+                getPossibleReferences(node.argument, currentRefs)
+                    .unwrap()
+                    .some((ref) => allSchemaRefs.has(ref))
             ) {
                 errors.push(
                     LintingError.fromNode(
@@ -113,6 +116,7 @@ function noMutationRecursive(
 
                 if (
                     getPossibleReferences(node.argument, currentRefs)
+                        .unwrap()
                         .some((ref) => allSchemaRefs.has(ref))
                 ) {
                     errors.push(
@@ -139,10 +143,12 @@ function noMutationRecursive(
             }
 
             const possibleMutations = node.left.type === "Identifier"
-                ? getPossibleReferences(node.left, currentRefs)
+                ? getPossibleReferences(node.left, currentRefs).unwrap()
                 : [
-                    ...getPossibleReferences(node.left, currentRefs),
-                    ...getPossibleReferences(node.left.object, currentRefs),
+                    ...getPossibleReferences(node.left, currentRefs)
+                        .unwrap(),
+                    ...getPossibleReferences(node.left.object, currentRefs)
+                        .unwrap(),
                 ];
             if (possibleMutations.some((ref) => allSchemaRefs.has(ref))) {
                 errors.push(
@@ -185,7 +191,7 @@ function noMutationRecursive(
             // Function expressions and Arrow expressions are handled in variable declarations
             const node = path.node;
             assertIsNodePos(node);
-            currentRefs[0]![node.id.name] = [node];
+            currentRefs[0]![node.id.name] = new Reference([node]);
         },
 
         CallExpression(path) {
@@ -196,6 +202,7 @@ function noMutationRecursive(
             if (node.callee.type === "MemberExpression") {
                 const { object, property } = node.callee;
                 getPossibleReferences(object, currentRefs)
+                    .unwrap()
                     .filter((arr) => allSchemaRefs.has(arr))
                     .filter(Array.isArray)
                     .filter(() => {
@@ -245,7 +252,7 @@ function noMutationRecursive(
                         ...getPossibleReferences(
                             node.callee,
                             currentRefs,
-                        ) as FunctionNode[],
+                        ).unwrap() as FunctionNode[],
                     );
                     break;
             }
@@ -257,10 +264,10 @@ function noMutationRecursive(
                     }
 
                     assertIsFnNode(fnNode);
-                    const fnParams: References = {};
+                    const fnParams: Record<string, Reference> = {};
                     fnNode.params.forEach((param, index) => {
                         if (param.type !== "Identifier") {
-                            throw new Error("TODO");
+                            throw new Error("TODO: destructuring");
                         }
                         fnParams[param.name] = args[index]!;
                     });
