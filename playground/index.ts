@@ -23,7 +23,7 @@ export const cogsCodeMirrorEditorTheme = EditorView.theme(
         "&": {
             backgroundColor: EDITOR_COLORS.background,
             color: EDITOR_COLORS.foreground,
-            fontSize: "15px",
+            fontSize: "25px",
             fontFamily: "Roboto Mono",
             overflowY: "auto",
             fontWeight: "normal",
