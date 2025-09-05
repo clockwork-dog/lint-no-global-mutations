@@ -181,7 +181,7 @@ Deno.test("update global deep property", () => {
 Deno.test("assign and mutate", () => {
     testFails("let a = globalObj; -->a++<--;");
 });
-Deno.test.ignore("assign and mutate member", () => {
+Deno.test("assign and mutate member", () => {
     testFails("let o = globalNestedObj; -->o.a++<--;");
 });
 Deno.test("assign and update member", () => {
@@ -198,7 +198,7 @@ Deno.test("adding a key to a nested global", () => {
             -->globalNestedObj.a.key = 'value'<--;
             `);
 });
-Deno.test.ignore("updates indirected global property", () => {
+Deno.test("updates indirected global property", () => {
     testFails(`
             let o = {};
             o.a = globalNestedObj.a;

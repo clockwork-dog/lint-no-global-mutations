@@ -20,6 +20,15 @@ function isNode(ref: unknown): ref is types.Node {
     return ref instanceof Node;
 }
 
+export const isInteger = (n: unknown) => {
+    switch (typeof n) {
+        case "number":
+            return Number.isInteger(n);
+        case "string":
+            return n === String(parseInt(n, 10));
+    }
+};
+
 const functionTypes = new Set([
     "FunctionDeclaration",
     "FunctionExpression",

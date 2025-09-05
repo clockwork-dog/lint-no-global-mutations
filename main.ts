@@ -15,6 +15,7 @@ import {
 } from "./get_possible_references.ts";
 import { Reference } from "./reference.ts";
 import { collectDeepReferences } from "./deep_references.ts";
+import { setPossibleReferences } from "./set_possible_references.ts";
 
 export function noMutation(
     program: types.Program,
@@ -95,7 +96,7 @@ function noMutationRecursive(
             assertIsNodePos(node);
             if (
                 getPossibleReferences(node.argument, currentRefs)
-                    .unwrap()
+                    .get()
                     .some((ref) => allSchemaRefs.has(ref))
             ) {
                 errors.push(
@@ -111,12 +112,9 @@ function noMutationRecursive(
             const node = path.node;
             assertIsNodePos(node);
             if (node.operator === "delete") {
-                console.log(node.argument);
-                console.log(getPossibleReferences(node.argument, currentRefs));
-
                 if (
                     getPossibleReferences(node.argument, currentRefs)
-                        .unwrap()
+                        .get()
                         .some((ref) => allSchemaRefs.has(ref))
                 ) {
                     errors.push(
@@ -143,12 +141,12 @@ function noMutationRecursive(
             }
 
             const possibleMutations = node.left.type === "Identifier"
-                ? getPossibleReferences(node.left, currentRefs).unwrap()
+                ? getPossibleReferences(node.left, currentRefs).get()
                 : [
                     ...getPossibleReferences(node.left, currentRefs)
-                        .unwrap(),
+                        .get(),
                     ...getPossibleReferences(node.left.object, currentRefs)
-                        .unwrap(),
+                        .get(),
                 ];
             if (possibleMutations.some((ref) => allSchemaRefs.has(ref))) {
                 errors.push(
@@ -160,6 +158,23 @@ function noMutationRecursive(
             }
 
             // TODO:  Update refs of other variables
+            let key: string | symbol | number;
+            const value = getPossibleReferences(node.right, currentRefs);
+            switch (node.left.type) {
+                case "Identifier":
+                    for (const refs of currentRefs) {
+                        if (node.left.name in refs) {
+                            refs[node.left.name]!.set(value);
+                            break;
+                        }
+                    }
+                    break;
+                case "MemberExpression":
+                    setPossibleReferences(node.left, node.right, currentRefs);
+                    break;
+                default:
+                    throw new Error("TODO!");
+            }
         },
 
         VariableDeclaration(path) {
@@ -202,7 +217,7 @@ function noMutationRecursive(
             if (node.callee.type === "MemberExpression") {
                 const { object, property } = node.callee;
                 getPossibleReferences(object, currentRefs)
-                    .unwrap()
+                    .get()
                     .filter((arr) => allSchemaRefs.has(arr))
                     .filter(Array.isArray)
                     .filter(() => {
@@ -252,7 +267,7 @@ function noMutationRecursive(
                         ...getPossibleReferences(
                             node.callee,
                             currentRefs,
-                        ).unwrap() as FunctionNode[],
+                        ).get() as FunctionNode[],
                     );
                     break;
             }

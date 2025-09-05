@@ -1,19 +1,25 @@
-import { getPossibleReferences } from "./get_possible_references.ts";
-import { parse } from "espree";
-import { types } from "estree-toolkit";
-import { assertEquals, assertGreater, assertStrictEquals } from "@std/assert";
+import {
+    getAllProperties,
+    getPossibleReferences,
+} from "./get_possible_references.ts";
+import {
+    assertArrayIncludes,
+    assertEquals,
+    assertGreater,
+    assertStrictEquals,
+} from "@std/assert";
 import { Reference } from "./reference.ts";
+import { parseEx } from "./test_utils.ts";
 
-const parseEx = (ex: string) => {
-    const program = parse(ex, { ecmaVersion: 2023 });
-    const firstNode = program.body[0];
-    if (firstNode?.type !== "ExpressionStatement") {
-        throw new Error(
-            `Exprected expression but got ${firstNode?.type}: ${ex}`,
-        );
-    }
-    return firstNode.expression as types.Expression;
-};
+Deno.test("gets all properties of array", () => {
+    assertArrayIncludes(getAllProperties([1]), ["0"]); // Member properties
+    assertArrayIncludes(getAllProperties([]), ["length"]); // Instance properties
+    assertArrayIncludes(getAllProperties([]), ["pop"]); // Prototype methods
+});
+Deno.test("gets all properties of object", () => {
+    assertArrayIncludes(getAllProperties({ a: 2 }), ["a"]); // Member properties
+    assertArrayIncludes(getAllProperties({}), ["toString"]); // Prototype methods
+});
 
 // Useful object references for tests
 const REF_A = {};
@@ -43,8 +49,8 @@ Deno.test("finds identifier references", () => {
         parseEx("a"),
         [{ a: new Reference([REF_A]) }],
     );
-    assertEquals(ref.unwrap().length, 1);
-    assertStrictEquals(ref.unwrap()[0], REF_A);
+    assertEquals(ref.get().length, 1);
+    assertStrictEquals(ref.get()[0], REF_A);
 });
 
 Deno.test("Logical expressions", () => {
@@ -87,8 +93,8 @@ Deno.test("can handle arrays", () => {
         parseEx("[a]"),
         [{ a: new Reference([referenceObj]) }],
     );
-    assertEquals(ref.unwrap().length, 1);
-    assertStrictEquals(ref.get(0).unwrap()[0], referenceObj);
+    assertEquals(ref.get().length, 1);
+    assertStrictEquals(ref.getKey(0).get()[0], referenceObj);
 });
 
 Deno.test("can handle array spread", () => {
@@ -99,9 +105,9 @@ Deno.test("can handle array spread", () => {
         [{ a: new Reference([refArrA]) }, { b: new Reference([refArrB]) }],
     );
 
-    assertEquals(ref.unwrap().length, 1);
-    assertStrictEquals((ref.unwrap()[0] as any)[0], REF_A);
-    assertStrictEquals((ref.unwrap()[0] as any)[1], REF_B);
+    assertEquals(ref.get().length, 1);
+    assertStrictEquals((ref.get()[0] as any)[0], REF_A);
+    assertStrictEquals((ref.get()[0] as any)[1], REF_B);
 });
 
 Deno.test("can handle simple objects", () => {
@@ -110,9 +116,9 @@ Deno.test("can handle simple objects", () => {
         [{ a: new Reference([REF_A]) }],
     );
 
-    assertEquals(ref.unwrap().length, 1);
-    assertEquals(ref.get("key").unwrap().length, 1);
-    assertStrictEquals(ref.get("key").unwrap()[0], REF_A);
+    assertEquals(ref.get().length, 1);
+    assertEquals(ref.getKey("key").get().length, 1);
+    assertStrictEquals(ref.getKey("key").get()[0], REF_A);
 });
 
 Deno.test("can handle nested objects", () => {
@@ -121,9 +127,12 @@ Deno.test("can handle nested objects", () => {
         [{ a: new Reference([REF_A]) }],
     );
 
-    assertEquals(refs.unwrap().length, 1);
-    assertEquals(refs.get("key").unwrap().length, 1);
-    assertStrictEquals(refs.get("key").get("arr").get(0).unwrap()[0], REF_A);
+    assertEquals(refs.get().length, 1);
+    assertEquals(refs.getKey("key").get().length, 1);
+    assertStrictEquals(
+        refs.getKey("key").getKey("arr").getKey(0).get()[0],
+        REF_A,
+    );
 });
 
 Deno.test("can handle computed keys in objects", () => {
@@ -132,33 +141,40 @@ Deno.test("can handle computed keys in objects", () => {
         [{ a: new Reference([REF_A]) }],
     );
 
-    assertEquals(ref.unwrap().length, 1);
-    assertEquals(ref.get("k" + "e" + "y").unwrap().length, 2);
-    assertEquals(ref.get("random-string").unwrap().length, 2);
-    const value = ref.get("random-string").unwrap()
+    assertEquals(ref.get().length, 1);
+    assertEquals(ref.getKey("k" + "e" + "y").get().length, 2);
+    assertEquals(ref.getKey("random-string").get().length, 2);
+    const value = ref.getKey("random-string").get()
         .filter((v) => v !== undefined)[0];
     assertStrictEquals(value, REF_A);
 });
 
 Deno.test("preserves Object reference", () => {
     const ref = getPossibleReferences(parseEx("Object"), []);
-    assertStrictEquals(ref.unwrap()[0], Object);
+    assertStrictEquals(ref.get()[0], Object);
 });
 
 Deno.test("preserves Object member reference", () => {
     const ref = getPossibleReferences(parseEx("Object.assign"), []);
-    assertStrictEquals(ref.unwrap()[0], Object.assign);
+    assertStrictEquals(ref.get()[0], Object.assign);
 });
 
 Deno.test("complex index falls back to all properties", () => {
     const ref = getPossibleReferences(parseEx("Object['as' + 'sign']"), []);
-    assertGreater(ref.unwrap().length, 1);
-    assertEquals(ref.unwrap().some((value) => value === Object.assign), true);
+    assertGreater(ref.get().length, 1);
+    assertEquals(ref.get().some((value) => value === Object.assign), true);
 });
 
-Deno.test("gets deep properties", () => {
+Deno.test("gets properties", () => {
     const ref = getPossibleReferences(parseEx("globalNestedObj.a"), [{
         globalNestedObj: new Reference([{ a: { b: { c: {} } } }]),
     }]);
-    assertEquals(ref.get("b").get("c").unwrap()[0], {});
+    assertEquals(ref.getKey("b").getKey("c").get()[0], {});
+});
+
+Deno.test("gets deep properties", () => {
+    const ref = getPossibleReferences(parseEx("globalNestedObj.a.b.c"), [{
+        globalNestedObj: new Reference([{ a: { b: { c: {} } } }]),
+    }]);
+    assertEquals(ref.get()[0], {});
 });

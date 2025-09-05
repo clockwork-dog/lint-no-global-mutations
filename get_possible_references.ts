@@ -4,6 +4,16 @@ import { Reference } from "./reference.ts";
 
 export type ReferenceStack = Record<string, Reference>[];
 
+export function getAllProperties(object: unknown) {
+    let obj = object;
+    const properties = [];
+    while (obj !== null) {
+        properties.push(...Object.getOwnPropertyNames(obj));
+        obj = Object.getPrototypeOf(obj);
+    }
+    return properties;
+}
+
 export function getPossibleReferences(
     ex: types.Expression | types.Super | undefined,
     referencesStack: ReferenceStack,
@@ -33,17 +43,17 @@ export function getPossibleReferences(
             // ||, &&, ??
             return new Reference([
                 ...getPossibleReferences(ex.left, referencesStack)
-                    .unwrap(),
+                    .get(),
                 ...getPossibleReferences(ex.right, referencesStack)
-                    .unwrap(),
+                    .get(),
             ]);
         case "ConditionalExpression":
             // condition ? a : b
             return new Reference([
                 ...getPossibleReferences(ex.consequent, referencesStack)
-                    .unwrap(),
+                    .get(),
                 ...getPossibleReferences(ex.alternate, referencesStack)
-                    .unwrap(),
+                    .get(),
             ]);
         case "AssignmentExpression":
             // a = b = {}
@@ -64,7 +74,7 @@ export function getPossibleReferences(
                 .forEach((elem) => {
                     if (elem?.type === "SpreadElement") {
                         getPossibleReferences(elem.argument, referencesStack)
-                            .unwrap()
+                            .get()
                             .filter(Array.isArray)
                             .forEach((arr) => {
                                 arr.forEach((item) => {
@@ -73,7 +83,7 @@ export function getPossibleReferences(
                             });
                     } else {
                         getPossibleReferences(elem, referencesStack)
-                            .unwrap()
+                            .get()
                             .forEach((p) => elements.push(p));
                     }
                 });
@@ -151,7 +161,7 @@ export function getPossibleReferences(
                 : ANY_STRING;
 
             getPossibleReferences(ex.object, referencesStack)
-                .unwrap()
+                .get()
                 .forEach((ref) => {
                     if (Array.isArray(ref)) {
                         possibleRefs.push(...ref);
