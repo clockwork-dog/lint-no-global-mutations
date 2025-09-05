@@ -208,27 +208,29 @@ Deno.test("updates indirected global property", () => {
 Deno.test("method inspects global property", () => {
     testPasses(`Object.keys(state.values);`);
 });
-Deno.test.ignore("Object.assign mutates global property", () => {
-    testFails(`-->Object.assign(state, {key: "value"})<--;`);
+Deno.test("Object.assign mutates global property", () => {
+    testFails(`-->Object.assign(globalObj, {key: "value"})<--;`);
 });
-Deno.test.ignore("Object.defineProperty mutates global property", () => {
-    testFails(`-->Object.defineProperty(state, 'key', {value: 'value'})<--;`);
+Deno.test("Object.defineProperty mutates global property", () => {
+    testFails(
+        `-->Object.defineProperty(globalObj, 'key', {value: 'value'})<--;`,
+    );
 });
-Deno.test.ignore("saves reference to mutating method", () => {
+Deno.test("saves reference to mutating method", () => {
     testFails(`
             const a = Object.assign;
-            -->a(state, {key: "value"})<--;
+            -->a(globalArr, {key: "value"})<--;
             `);
 });
-Deno.test.ignore("doesn't allow dynamic global Object properties", () => {
+Deno.test("doesn't allow dynamic global Object properties", () => {
     testFails(`
-            -->Object['define' + 'Property'](state, 'key', {value: 'value'})<--
+            -->Object['define' + 'Property'](globalObj, 'key', {value: 'value'})<--
             `);
 });
-Deno.test.ignore("doesn't allow dynamic referenced Object properties", () => {
+Deno.test("doesn't allow dynamic referenced Object properties", () => {
     testFails(`
             const o = Object;
-            -->o['define' + 'Property'](state, 'key', {value: 'value'})<--;
+            -->o['define' + 'Property'](globalObj, 'key', {value: 'value'})<--;
             `);
 });
 Deno.test("doesn't allow nested dynamic referenced Object properties", () => {

@@ -6,7 +6,8 @@ import {
     FunctionNode,
     isFnNode,
     LintingError,
-    NON_MUTATING_ARRAY_INSTANCE_METHOD_NAMES,
+    MUTATING_ARRAY_INSTANCE_METHODS,
+    MUTATING_OBJECT_PROTOTYPE_METHODS,
 } from "./util.ts";
 import { assert } from "@std/assert";
 import {
@@ -111,9 +112,12 @@ function noMutationRecursive(
         UnaryExpression(path) {
             const node = path.node;
             assertIsNodePos(node);
-            if (node.operator === "delete") {
+            if (
+                node.operator === "delete" &&
+                node.argument.type === "MemberExpression"
+            ) {
                 if (
-                    getPossibleReferences(node.argument, currentRefs)
+                    getPossibleReferences(node.argument.object, currentRefs)
                         .get()
                         .some((ref) => allSchemaRefs.has(ref))
                 ) {
@@ -157,8 +161,6 @@ function noMutationRecursive(
                 );
             }
 
-            // TODO:  Update refs of other variables
-            let key: string | symbol | number;
             const value = getPossibleReferences(node.right, currentRefs);
             switch (node.left.type) {
                 case "Identifier":
@@ -212,43 +214,6 @@ function noMutationRecursive(
         CallExpression(path) {
             const node = path.node;
             assertIsNodePos(node);
-
-            // Check for Array instance methods
-            if (node.callee.type === "MemberExpression") {
-                const { object, property } = node.callee;
-                getPossibleReferences(object, currentRefs)
-                    .get()
-                    .filter((arr) => allSchemaRefs.has(arr))
-                    .filter(Array.isArray)
-                    .filter(() => {
-                        if (
-                            property.type === "Identifier" &&
-                            NON_MUTATING_ARRAY_INSTANCE_METHOD_NAMES.has(
-                                property.name,
-                            )
-                        ) {
-                            return false;
-                        }
-                        if (
-                            property.type === "Literal" &&
-                            NON_MUTATING_ARRAY_INSTANCE_METHOD_NAMES.has(
-                                property.value as any,
-                            )
-                        ) {
-                            return false;
-                        }
-                        return true;
-                    })
-                    .forEach(() => {
-                        errors.push(
-                            LintingError.fromNode(`Array mutation`, node),
-                        );
-                    });
-            }
-
-            // Check for Object prototype methods
-
-            // Check for user functions
             const args = node.arguments.map((arg) => {
                 if (arg.type === "SpreadElement") {
                     throw new Error("TODO: spread");
@@ -256,6 +221,49 @@ function noMutationRecursive(
                 return getPossibleReferences(arg, currentRefs);
             });
 
+            // array methods, object methods, .call()
+            if (node.callee.type === "MemberExpression") {
+                const { object } = node.callee;
+
+                // Array instance properties
+                if (
+                    getPossibleReferences(node.callee, currentRefs).get().some(
+                        (method) => MUTATING_ARRAY_INSTANCE_METHODS.has(method),
+                    )
+                ) {
+                    getPossibleReferences(
+                        object,
+                        currentRefs,
+                    )
+                        .get()
+                        .filter(Array.isArray)
+                        .filter((arr) => allSchemaRefs.has(arr))
+                        .forEach(() => {
+                            errors.push(
+                                LintingError.fromNode("STOP THAT!", node),
+                            );
+                        });
+                }
+            }
+
+            // Object prototype methods
+            if (
+                getPossibleReferences(node.callee, currentRefs).get().some(
+                    (method) => MUTATING_OBJECT_PROTOTYPE_METHODS.has(method),
+                )
+            ) {
+                if (
+                    args.some((arg) =>
+                        arg.get().some((poss) => allSchemaRefs.has(poss))
+                    )
+                ) {
+                    errors.push(
+                        LintingError.fromNode("STOP THAT!", node),
+                    );
+                }
+            }
+
+            // Check for user functions
             const possibleFns: FunctionNode[] = [];
             switch (node.callee.type) {
                 case "FunctionExpression":

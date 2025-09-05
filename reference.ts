@@ -21,7 +21,11 @@ export class Reference {
                     possibilities.push(...poss);
                 } else if (key === ANY_STRING) {
                     for (const prop of getAllProperties(poss)) {
-                        possibilities.push((poss as any)[prop]);
+                        try {
+                            possibilities.push((poss as any)[prop]);
+                        } catch (_e) {
+                            // strict mode throws when accessing Function.callee/caller/arguments
+                        }
                     }
                 } else {
                     possibilities.push((poss as any)[key]);
