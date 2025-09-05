@@ -162,7 +162,7 @@ Deno.test("mutation iife", () => {
         -->((arr) => {arr++})(globalArr)<--;
         `);
 });
-Deno.test.ignore("mutation from object member", () => {
+Deno.test("mutation from object member", () => {
     testFails(`
         const o = { f: function mutate(x) { x++; } };
         -->o.f(globalArr)<--;
@@ -283,10 +283,10 @@ Deno.test.ignore("globalThis access", () => {
             o.assign(state, {key: value});
             `);
 });
-Deno.test.ignore("unknown array element mutation", () => {
+Deno.test("unknown array element mutation", () => {
     testFails(`
-            const references = [this, {value: 1}];
-            delete references[Math.floor(Math.random() * 2)].value;
+            const references = [globalNestedObj, {value: 1}];
+            -->delete references[Math.floor(Math.random() * 2)].value<--;
             `);
 });
 
