@@ -278,11 +278,18 @@ Deno.test("array instance methods on user owned array", () => {
           const lastScene = allScenes.pop();
       `);
 });
+Deno.test.ignore("tracks reference through array.pop", () => {
+    testFails(`
+          const allScenes = [...scenes];
+          const lastScene = allScenes.pop();
+          -->lastScene++<--;
+      `);
+});
 
 Deno.test.ignore("globalThis access", () => {
     testFails(`
             const o = globalThis['Obj' + 'ect'];
-            o.assign(state, {key: value});
+            -->o.assign(globalObj, {key: value})<--;
             `);
 });
 Deno.test("unknown array element mutation", () => {
@@ -342,5 +349,11 @@ Deno.test.ignore("Tagged template binded Object prototype methods", () => {
     testFails(`
         const pop = Object.getPrototypeOf([]).pop.bind(globalArr);
         -->pop\`aah\`<--;
+        `);
+});
+Deno.test.ignore("Searching through object prototypes", () => {
+    testFails(`
+        const a = ({}).__proto__.constructor.assign;
+        -->a(globalArr, { key: 'value' })<--;
         `);
 });

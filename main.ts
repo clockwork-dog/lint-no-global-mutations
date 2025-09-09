@@ -1,7 +1,6 @@
 import { traverse, types } from "estree-toolkit";
 import { constructScopes } from "./scopes.ts";
 import {
-    assertIsFnNode,
     assertIsNodePos,
     FunctionNode,
     isFnNode,
@@ -286,7 +285,6 @@ function noMutationRecursive(
                         return;
                     }
 
-                    assertIsFnNode(fnNode);
                     const fnParams: Record<string, Reference> = {};
                     fnNode.params.forEach((param, index) => {
                         if (param.type !== "Identifier") {
