@@ -1,5 +1,23 @@
 import { types } from "estree-toolkit";
 import { parse } from "espree";
+import { Reference } from "./reference.ts";
+
+export const functionTypes = new Set([
+    "FunctionDeclaration",
+    "FunctionExpression",
+    "ArrowFunctionExpression",
+]);
+export type FunctionNode =
+    | types.FunctionDeclaration
+    | types.FunctionExpression
+    | types.ArrowFunctionExpression;
+export type ScopeNode =
+    | types.BlockStatement
+    | types.Program
+    | FunctionNode
+    | null;
+export type References = Record<string, Reference>;
+export type ReferenceStack = Array<[ScopeNode, References]>;
 
 export type NodePos = {
     start: number;
@@ -29,15 +47,6 @@ export const isInteger = (n: unknown) => {
     }
 };
 
-const functionTypes = new Set([
-    "FunctionDeclaration",
-    "FunctionExpression",
-    "ArrowFunctionExpression",
-]);
-export type FunctionNode =
-    | types.FunctionDeclaration
-    | types.FunctionExpression
-    | types.ArrowFunctionExpression;
 export function isFnNode(ref: unknown): ref is FunctionNode & NodePos {
     if (!isNode(ref)) return false;
     if (!isNodePos(ref)) return false;
@@ -71,78 +80,3 @@ export class LintingError extends Error {
         return this.constructor.name;
     }
 }
-
-export const MUTATING_ARRAY_INSTANCE_METHOD_NAMES = new Set([
-    // "at",
-    // "concat",
-    "copyWithin",
-    // "entries",
-    // "every",
-    "fill",
-    // "filter",
-    // "find",
-    // "findIndex",
-    // "findLast",
-    // "findLastIndex",
-    // "flat",
-    // "flatMap",
-    // "forEach",
-    // "includes",
-    // "indexOf",
-    // "join",
-    // "keys",
-    // "lastIndexOf",
-    // "map",
-    "pop",
-    "push",
-    // "reduce",
-    // "reduceRight",
-    "reverse",
-    "shift",
-    // "slice",
-    // "some",
-    "sort",
-    "splice",
-    // "toLocaleString",
-    // "toReversed",
-    // "toSorted",
-    // "toSpliced",
-    // "toString",
-    "unshift",
-    // "values",
-    // "with",
-]);
-export const MUTATING_ARRAY_INSTANCE_METHODS = new Set<any>(
-    Array.from(MUTATING_ARRAY_INSTANCE_METHOD_NAMES)
-        .map((methodName: any) => [][methodName]),
-);
-
-export const MUTATING_OBJECT_PROTOTYPE_METHOD_NAMES = new Set<any>([
-    "assign",
-    // "create",
-    "defineProperties",
-    "defineProperty",
-    // "entries",
-    "freeze",
-    // "fromEntries",
-    // "getOwnPropertyDescriptor",
-    // "getOwnPropertyDescriptors",
-    // "getOwnPropertyNames",
-    // "getOwnPropertySymbols",
-    // "getPrototypeOf",
-    // "groupBy",
-    // "hasOwn",
-    // "is",
-    // "isExtensible",
-    // "isFrozen",
-    // "isSealed",
-    // "keys",
-    "preventExtensions",
-    "seal",
-    "setPrototypeOf",
-    // "values",
-]);
-export const MUTATING_OBJECT_PROTOTYPE_METHODS = new Set<any>(
-    Array.from(MUTATING_OBJECT_PROTOTYPE_METHOD_NAMES)
-        .map((methodName: any) => (Object as any)[methodName]),
-);

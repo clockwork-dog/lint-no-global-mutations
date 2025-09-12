@@ -1,20 +1,16 @@
-import { parse } from "espree";
 import { traverse, types } from "estree-toolkit";
-import { assertIsNodePos, NodePos } from "./util.ts";
+import { assertIsNodePos, ReferenceStack } from "./util.ts";
+import { Reference } from "./reference.ts";
 
-export type Program = ReturnType<typeof parse>;
-
-export type Scope = {
-    [ident: string]: NodePos;
-};
-
-export function constructScopes(
+export function constructHoistedScopes(
     program: types.Program,
-) {
-    let currentScopeStack: Scope[] = [{}];
+): Record<string | number, ReferenceStack> {
+    let currentScopeStack: ReferenceStack = [[program, {}]];
     // At the start of each block statement, this will be the current stack
     // (We will construct all hoisted declarations)
-    const allScopeStacks: Record<number, Scope[]> = { "-1": currentScopeStack };
+    const allScopeStacks: Record<string | number, ReferenceStack> = {
+        "-1": currentScopeStack,
+    };
 
     traverse(program, {
         BlockStatement: {
@@ -22,7 +18,7 @@ export function constructScopes(
                 if (!path) return;
                 assertIsNodePos(path.node);
 
-                currentScopeStack = [{}, ...currentScopeStack];
+                currentScopeStack = [...currentScopeStack, [path.node, {}]];
                 allScopeStacks[path.node.start] = currentScopeStack;
             },
             leave() {
@@ -34,15 +30,20 @@ export function constructScopes(
             if (!path?.node) return;
             const { node } = path;
             if (node.kind !== "var") return;
+
             node.declarations.forEach((declarator) => {
                 if (!declarator) return;
-                assertIsNodePos(declarator.id);
                 switch (declarator.id.type) {
                     case "Identifier": {
                         assertIsNodePos(declarator.id);
-                        const { name, start, end } = declarator.id;
-                        if (name in currentScopeStack[0]!) throw new Error("");
-                        currentScopeStack[0]![name] = { start, end };
+                        const { name } = declarator.id;
+                        const [_node, scope] = currentScopeStack[0]!;
+                        if (name in scope) {
+                            throw new Error(
+                                `Duplicate variable initialization: ${name}`,
+                            );
+                        }
+                        scope[name] = new Reference();
                         break;
                     }
                     // TODO:!
@@ -57,13 +58,14 @@ export function constructScopes(
 
         FunctionDeclaration(path) {
             if (!path?.node) return;
-            const { node } = path;
-            assertIsNodePos(node.id);
-            const { name, start, end } = node.id;
-            if (name in currentScopeStack[0]!) throw new Error("");
-            currentScopeStack[0]![name] = { start, end };
-
-            currentScopeStack[0];
+            const { name } = path.node.id;
+            const [_node, scope] = currentScopeStack[0]!;
+            if (name in scope) {
+                throw new Error(
+                    `Duplicate variable initialization: ${name}`,
+                );
+            }
+            scope[name] = new Reference([path.node]);
         },
     });
 

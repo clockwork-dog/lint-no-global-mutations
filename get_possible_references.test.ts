@@ -47,7 +47,7 @@ Deno.test("literals don't have references", () => {
 Deno.test("finds identifier references", () => {
     const ref = getPossibleReferences(
         parseEx("a"),
-        [{ a: new Reference([REF_A]) }],
+        [[null, { a: new Reference([REF_A]) }]],
     );
     assertEquals(ref.get().length, 1);
     assertStrictEquals(ref.get()[0], REF_A);
@@ -57,21 +57,21 @@ Deno.test("Logical expressions", () => {
     assertEquals(
         getPossibleReferences(
             parseEx(`a || b`),
-            [{ a: new Reference([REF_A]), b: new Reference([REF_B]) }],
+            [[null, { a: new Reference([REF_A]), b: new Reference([REF_B]) }]],
         ),
         new Reference([REF_A, REF_B]),
     );
     assertEquals(
         getPossibleReferences(
             parseEx(`a && b`),
-            [{ a: new Reference([REF_A]), b: new Reference([REF_B]) }],
+            [[null, { a: new Reference([REF_A]), b: new Reference([REF_B]) }]],
         ),
         new Reference([REF_A, REF_B]),
     );
     assertEquals(
         getPossibleReferences(
             parseEx(`a ?? b`),
-            [{ a: new Reference([REF_A]), b: new Reference([REF_B]) }],
+            [[null, { a: new Reference([REF_A]), b: new Reference([REF_B]) }]],
         ),
         new Reference([REF_A, REF_B]),
     );
@@ -81,7 +81,7 @@ Deno.test("Ternary expressions", () => {
     assertEquals(
         getPossibleReferences(
             parseEx(`Math.random() > 0.5 ? a : b`),
-            [{ a: new Reference([REF_A]), b: new Reference([REF_B]) }],
+            [[null, { a: new Reference([REF_A]), b: new Reference([REF_B]) }]],
         ),
         new Reference([REF_A, REF_B]),
     );
@@ -91,7 +91,7 @@ Deno.test("can handle arrays", () => {
     const referenceObj = {};
     const ref = getPossibleReferences(
         parseEx("[a]"),
-        [{ a: new Reference([referenceObj]) }],
+        [[null, { a: new Reference([referenceObj]) }]],
     );
     assertEquals(ref.get().length, 1);
     assertStrictEquals(ref.getKey(0).get()[0], referenceObj);
@@ -102,7 +102,7 @@ Deno.test("can handle array spread", () => {
     const refArrB = [REF_B];
     const ref = getPossibleReferences(
         parseEx("[...a, ...b]"),
-        [{ a: new Reference([refArrA]) }, { b: new Reference([refArrB]) }],
+        [[null, { a: new Reference([refArrA]), b: new Reference([refArrB]) }]],
     );
 
     assertEquals(ref.get().length, 1);
@@ -113,7 +113,7 @@ Deno.test("can handle array spread", () => {
 Deno.test("can handle simple objects", () => {
     const ref = getPossibleReferences(
         parseEx("({key: a})"),
-        [{ a: new Reference([REF_A]) }],
+        [[null, { a: new Reference([REF_A]) }]],
     );
 
     assertEquals(ref.get().length, 1);
@@ -124,7 +124,7 @@ Deno.test("can handle simple objects", () => {
 Deno.test("can handle nested objects", () => {
     const refs = getPossibleReferences(
         parseEx("({ key: { arr: [a] } })"),
-        [{ a: new Reference([REF_A]) }],
+        [[null, { a: new Reference([REF_A]) }]],
     );
 
     assertEquals(refs.get().length, 1);
@@ -138,7 +138,7 @@ Deno.test("can handle nested objects", () => {
 Deno.test("can handle computed keys in objects", () => {
     const ref = getPossibleReferences(
         parseEx("({['k' + 'e' + 'y']: a})"),
-        [{ a: new Reference([REF_A]) }],
+        [[null, { a: new Reference([REF_A]) }]],
     );
 
     assertEquals(ref.get().length, 1);
@@ -166,15 +166,18 @@ Deno.test("complex index falls back to all properties", () => {
 });
 
 Deno.test("gets properties", () => {
-    const ref = getPossibleReferences(parseEx("globalNestedObj.a"), [{
+    const ref = getPossibleReferences(parseEx("globalNestedObj.a"), [[null, {
         globalNestedObj: new Reference([{ a: { b: { c: {} } } }]),
-    }]);
+    }]]);
     assertEquals(ref.getKey("b").getKey("c").get()[0], {});
 });
 
 Deno.test("gets deep properties", () => {
-    const ref = getPossibleReferences(parseEx("globalNestedObj.a.b.c"), [{
-        globalNestedObj: new Reference([{ a: { b: { c: {} } } }]),
-    }]);
+    const ref = getPossibleReferences(parseEx("globalNestedObj.a.b.c"), [[
+        null,
+        {
+            globalNestedObj: new Reference([{ a: { b: { c: {} } } }]),
+        },
+    ]]);
     assertEquals(ref.get()[0], {});
 });

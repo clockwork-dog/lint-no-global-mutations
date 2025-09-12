@@ -1,8 +1,6 @@
 import { types } from "estree-toolkit";
-import { ANY_STRING } from "./util.ts";
+import { ANY_STRING, ReferenceStack } from "./util.ts";
 import { Reference } from "./reference.ts";
-
-export type ReferenceStack = Record<string, Reference>[];
 
 export function getAllProperties(object: unknown) {
     let obj = object;
@@ -15,15 +13,15 @@ export function getAllProperties(object: unknown) {
 }
 
 export function getPossibleReferences(
-    ex: types.Expression | types.Super | undefined,
+    ex: types.Expression | types.Super | null | undefined,
     referencesStack: ReferenceStack,
 ): Reference {
-    if (!ex) return new Reference();
+    if (!ex) return new Reference([ex]);
     switch (ex.type) {
         case "Literal":
             return new Reference([ex.value]);
         case "Identifier":
-            for (const references of referencesStack) {
+            for (const [, references] of referencesStack) {
                 if (ex.name in references) {
                     return references[ex.name]!;
                 }
@@ -115,6 +113,7 @@ export function getPossibleReferences(
                                 referencesStack,
                             );
                             break;
+                        case "CallExpression":
                         case "PrivateIdentifier":
                         case "JSXElement":
                         case "JSXFragment":
@@ -123,7 +122,6 @@ export function getPossibleReferences(
                         case "AssignmentExpression":
                         case "AwaitExpression":
                         case "BinaryExpression":
-                        case "CallExpression":
                         case "ChainExpression":
                         case "ClassExpression":
                         case "ConditionalExpression":

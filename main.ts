@@ -1,21 +1,30 @@
 import { traverse, types } from "estree-toolkit";
-import { constructScopes } from "./scopes.ts";
+import { constructHoistedScopes } from "./scopes.ts";
 import {
     assertIsNodePos,
     FunctionNode,
+    functionTypes,
     isFnNode,
     LintingError,
-    MUTATING_ARRAY_INSTANCE_METHODS,
-    MUTATING_OBJECT_PROTOTYPE_METHODS,
+    References,
+    ReferenceStack,
 } from "./util.ts";
 import { assert } from "@std/assert";
-import {
-    getPossibleReferences,
-    ReferenceStack,
-} from "./get_possible_references.ts";
+import { getPossibleReferences } from "./get_possible_references.ts";
 import { Reference } from "./reference.ts";
 import { collectDeepReferences } from "./deep_references.ts";
 import { setPossibleReferences } from "./set_possible_references.ts";
+import { evaluateFunction } from "./functions.ts";
+import { arrayCallbackMethod } from "./array.ts";
+import { objectCallbackMethod } from "./object.ts";
+
+export interface State {
+    node: types.Node;
+    currentRefs: ReferenceStack;
+    hoistedRefStacks: Record<string | number, ReferenceStack>;
+    allGlobalRefs: Set<unknown>;
+    errors: LintingError[];
+}
 
 export function noMutation(
     program: types.Program,
@@ -25,73 +34,136 @@ export function noMutation(
     // Construct global scope
     // Get the current scope stack and attach empty reference arrays
     // These will be populated with possible global references later
-    const hoistedScopes = constructScopes(program);
-    const hoistedRefs: Record<string | number, ReferenceStack> = {};
-    Object.entries(hoistedScopes).forEach(([start, scopes]) => {
-        // TODO: number lookup is gross
-        hoistedRefs[start] = scopes.map((scope) => {
-            const refs: Record<string, Reference> = {};
-            Object.entries(scope).forEach(([name, value]) => {
-                refs[name] = new Reference([value]);
-            });
-            return refs;
-        });
-    });
+    const hoistedRefs = constructHoistedScopes(program);
 
     if (typeof schemaObj !== "object" || Array.isArray(schemaObj)) {
         throw new Error(
             `schemaObj was not an object, got ${JSON.stringify(schemaObj)}`,
         );
     }
-    const globalRefs: ReferenceStack[number] = {};
+    const globalRefs: References = {};
     Object.entries(schemaObj).forEach(([key, value]) => {
         globalRefs[key] = new Reference([value]);
     });
 
-    const currentHoistedScope = hoistedScopes["-1"]![0]!;
-    const currentHoistedRefs: ReferenceStack[number] = {};
+    const currentHoistedScope = hoistedRefs["-1"]![0]!;
+    const currentHoistedRefs: References = {};
     Object.entries(currentHoistedScope).forEach(([key]) => {
         currentHoistedRefs[key] = new Reference();
     });
-    const currentRefs: ReferenceStack = [currentHoistedRefs, globalRefs];
+    const currentRefs: ReferenceStack = [
+        [program, currentHoistedRefs],
+        [null, globalRefs],
+    ];
 
-    return noMutationRecursive(
+    const errors: LintingError[] = [];
+    noMutationRecursive(
         program,
         currentRefs,
         hoistedRefs,
         allSchemaRefs,
+        errors,
     );
+
+    return errors;
 }
 
-function noMutationRecursive(
+export function noMutationRecursive(
     code:
         | types.Program
         | types.FunctionDeclaration
         | types.FunctionExpression
         | types.ArrowFunctionExpression,
     refsStack: ReferenceStack,
-    hoistedRefs: Record<number, ReferenceStack>,
+    hoistedRefStacks: Record<number, ReferenceStack>,
     allSchemaRefs: Set<unknown>,
-) {
-    const errors: LintingError[] = [];
-    let currentRefs = refsStack;
+    errors: LintingError[],
+): Reference {
+    const currentRefs = refsStack;
+    const returnValue = new Reference();
+
+    // Completely ignore all code inside function bodies as it will be checked when invoked.
+    //.This means when inside a function body, the function node will always be on top of the stack.
+    const ignoreIfInsideFunctionBody = () => {
+        const [topNode, _stack] = currentRefs[0]!;
+        if (
+            functionTypes.has(topNode?.type as any) && // We're in a function body
+            topNode !== code // We're executing said function
+        ) {
+            return true;
+        } else {
+            return false;
+        }
+    };
+
     traverse(code, {
         // We still need to keep track of non-hoisted variables (let / const)
         // So we just initialize each scope with hoisted variables
         BlockStatement: {
             enter(path) {
+                if (ignoreIfInsideFunctionBody()) return;
                 assertIsNodePos(path.node);
-                const newHoistedRefs = hoistedRefs[path.node.start]?.[0];
+                const newHoistedRefs = hoistedRefStacks[path.node.start]?.[0];
                 // Each scope should appear in the hoisted scopes, and be indexed by the start
-                assert(newHoistedRefs, "");
-                currentRefs = [newHoistedRefs, ...currentRefs];
+                assert(
+                    newHoistedRefs,
+                    `Cannot find hoisted scope at ${path.node.start}`,
+                );
+                currentRefs.unshift(newHoistedRefs);
             },
             leave(_path) {
-                currentRefs = currentRefs.slice(1);
+                if (ignoreIfInsideFunctionBody()) return;
+                currentRefs.shift();
             },
         },
 
+        // Whenever I get to a function I want to save reference to it so I can use it later.
+        // I want to add it on the stack as a 'marker', then ignore everything until it comes
+        // off the stack.
+
+        FunctionExpression: {
+            enter(path) {
+                if (ignoreIfInsideFunctionBody()) return;
+                assertIsNodePos(path.node);
+                currentRefs.unshift([path.node, {}]);
+            },
+            leave() {
+                currentRefs.shift();
+            },
+        },
+        ArrowFunctionExpression: {
+            enter(path) {
+                if (ignoreIfInsideFunctionBody()) return;
+                assertIsNodePos(path.node);
+                currentRefs.unshift([path.node, {}]);
+            },
+            leave() {
+                currentRefs.shift();
+            },
+        },
+        FunctionDeclaration: {
+            enter(path) {
+                if (ignoreIfInsideFunctionBody()) return;
+                const node = path.node;
+                assertIsNodePos(node);
+                const [, scope] = currentRefs[0]!;
+                scope[node.id.name] = new Reference([node]);
+                currentRefs.unshift([node, {}]);
+            },
+            leave() {
+                currentRefs.shift();
+            },
+        },
+        ReturnStatement(path) {
+            if (ignoreIfInsideFunctionBody()) return;
+            const node = path?.node;
+            assertIsNodePos(node);
+            const val = getPossibleReferences(node.argument, currentRefs);
+            returnValue.set(val);
+        },
+
         UpdateExpression(path) {
+            if (ignoreIfInsideFunctionBody()) return;
             const node = path?.node;
             assertIsNodePos(node);
             if (
@@ -109,6 +181,7 @@ function noMutationRecursive(
         },
 
         UnaryExpression(path) {
+            if (ignoreIfInsideFunctionBody()) return;
             const node = path.node;
             assertIsNodePos(node);
             if (
@@ -131,6 +204,7 @@ function noMutationRecursive(
         },
 
         AssignmentExpression(path) {
+            if (ignoreIfInsideFunctionBody()) return;
             const node = path.node;
             assertIsNodePos(node);
 
@@ -163,7 +237,7 @@ function noMutationRecursive(
             const value = getPossibleReferences(node.right, currentRefs);
             switch (node.left.type) {
                 case "Identifier":
-                    for (const refs of currentRefs) {
+                    for (const [, refs] of currentRefs) {
                         if (node.left.name in refs) {
                             refs[node.left.name]!.set(value);
                             break;
@@ -179,6 +253,7 @@ function noMutationRecursive(
         },
 
         VariableDeclaration(path) {
+            if (ignoreIfInsideFunctionBody()) return;
             const node = path.node;
             assertIsNodePos(node);
 
@@ -186,13 +261,15 @@ function noMutationRecursive(
                 const { id, init } = declaration;
                 if (!init) return;
                 switch (id.type) {
-                    case "Identifier":
+                    case "Identifier": {
                         // Keep track of all the possibilities of the init
-                        currentRefs[0]![id.name] = getPossibleReferences(
+                        const [, scope] = currentRefs[0]!;
+                        scope[id.name] = getPossibleReferences(
                             init,
                             currentRefs,
                         );
                         break;
+                    }
                     case "ObjectPattern":
                     case "RestElement":
                     case "MemberExpression":
@@ -203,14 +280,8 @@ function noMutationRecursive(
             });
         },
 
-        FunctionDeclaration(path) {
-            // Function expressions and Arrow expressions are handled in variable declarations
-            const node = path.node;
-            assertIsNodePos(node);
-            currentRefs[0]![node.id.name] = new Reference([node]);
-        },
-
         CallExpression(path) {
+            if (ignoreIfInsideFunctionBody()) return;
             const node = path.node;
             assertIsNodePos(node);
             const args = node.arguments.map((arg) => {
@@ -220,47 +291,21 @@ function noMutationRecursive(
                 return getPossibleReferences(arg, currentRefs);
             });
 
-            // array methods, object methods, .call()
-            if (node.callee.type === "MemberExpression") {
-                const { object } = node.callee;
+            arrayCallbackMethod({
+                node: node,
+                currentRefs,
+                allGlobalRefs: allSchemaRefs,
+                hoistedRefStacks,
+                errors,
+            }, args);
 
-                // Array instance properties
-                if (
-                    getPossibleReferences(node.callee, currentRefs).get().some(
-                        (method) => MUTATING_ARRAY_INSTANCE_METHODS.has(method),
-                    )
-                ) {
-                    getPossibleReferences(
-                        object,
-                        currentRefs,
-                    )
-                        .get()
-                        .filter(Array.isArray)
-                        .filter((arr) => allSchemaRefs.has(arr))
-                        .forEach(() => {
-                            errors.push(
-                                LintingError.fromNode("STOP THAT!", node),
-                            );
-                        });
-                }
-            }
-
-            // Object prototype methods
-            if (
-                getPossibleReferences(node.callee, currentRefs).get().some(
-                    (method) => MUTATING_OBJECT_PROTOTYPE_METHODS.has(method),
-                )
-            ) {
-                if (
-                    args.some((arg) =>
-                        arg.get().some((poss) => allSchemaRefs.has(poss))
-                    )
-                ) {
-                    errors.push(
-                        LintingError.fromNode("STOP THAT!", node),
-                    );
-                }
-            }
+            objectCallbackMethod({
+                node: node,
+                currentRefs,
+                allGlobalRefs: allSchemaRefs,
+                hoistedRefStacks,
+                errors,
+            }, args);
 
             // Check for user functions
             const possibleFns: FunctionNode[] = [];
@@ -284,32 +329,16 @@ function noMutationRecursive(
                     if (!isFnNode(fnNode)) {
                         return;
                     }
-
-                    const fnParams: Record<string, Reference> = {};
-                    fnNode.params.forEach((param, index) => {
-                        if (param.type !== "Identifier") {
-                            throw new Error("TODO: destructuring");
-                        }
-                        fnParams[param.name] = args[index]!;
-                    });
-                    currentRefs = [fnParams, ...currentRefs];
-
-                    errors.push(
-                        ...noMutationRecursive(
-                            fnNode,
-                            currentRefs,
-                            hoistedRefs,
-                            allSchemaRefs,
-                        ).map((err) => {
-                            err.start = node.start;
-                            err.end = node.end;
-                            return err;
-                        }),
-                    );
-                    currentRefs = currentRefs.slice(1);
+                    evaluateFunction({
+                        node: fnNode,
+                        currentRefs,
+                        hoistedRefStacks: hoistedRefStacks,
+                        allGlobalRefs: allSchemaRefs,
+                        errors,
+                    }, args);
                 },
             );
         },
     });
-    return errors;
+    return returnValue;
 }

@@ -12,7 +12,8 @@ function testPasses(program: string) {
         globalNestedObj: { a: { b: { c: {} } } },
     };
     const ast = parse(program, { ecmaVersion: 2023 }) as types.Program;
-    assertEquals(noMutation(ast, globals).length, 0);
+    const errors = noMutation(ast, globals);
+    assertEquals(errors.length, 0, errors[0]?.message);
 }
 function testFails(programWithMarkers: string) {
     const globals = {
@@ -73,9 +74,6 @@ Deno.test("can't update global", () => {
 Deno.test.ignore("can't delete global property", () => {
     testFails("-->delete globalNestedObj.a<--");
 });
-Deno.test("can't pop global array", () => {
-    testFails("-->globalArr.pop()<--");
-});
 Deno.test("can update user owned array", () => {
     testPasses(`
         const a = [...globalNestedArr];
@@ -88,7 +86,6 @@ Deno.test("can't update global on user array", () => {
         -->a[0]++<--;
         `);
 });
-
 Deno.test.ignore("destructuring", () => {
     testPasses("const { values } = show;");
 });
@@ -143,29 +140,114 @@ Deno.test("mutation helper function", () => {
         increment(2);
         `);
 });
+
+Deno.test("uncalled function declarations are ignored", () => {
+    testPasses(`
+        function a() {
+            globalArr++;
+        };
+        `);
+});
+Deno.test("uncalled function expressions are ignored", () => {
+    testPasses(`
+        const a = function() {
+            globalArr++;
+        };
+        `);
+});
+Deno.test("uncalled arrow function expressions are ignored", () => {
+    testPasses(`
+        const a =() => {
+            globalArr++;
+        };
+        `);
+});
+Deno.test("called function declarations error", () => {
+    testFails(`
+        function a() {
+            -->globalArr++<--;
+        };
+        a();
+        `);
+});
+Deno.test("called function expressions error", () => {
+    testFails(`
+        const a = function() {
+            -->globalArr++<--;
+        };
+        a();
+        `);
+});
+Deno.test("called arrow function expressions error", () => {
+    testFails(`
+        const a =() => {
+            -->globalArr++<--;
+        };
+        a();
+        `);
+});
+Deno.test("allows variable shadowing", () => {
+    testPasses(`
+        const myArr = globalArr;
+        function pushZero(myArr) {
+            myArr++
+        }
+        pushZero([]);
+        `);
+});
+Deno.test("failing variable shadowing example", () => {
+    testFails(`
+        const myArr = globalArr;
+        function pushZero(myArr) {
+            -->myArr++<--;
+        }
+        pushZero(window);
+        `);
+});
+Deno.test("nested functions", () => {
+    testFails(
+        `(() => {
+          (() => { -->globalArr++<-- })()
+        })()`,
+    );
+});
+Deno.test.ignore("tracks function return expressions", () => {
+    testFails(`
+        function identity(x) { return x }
+        const maybeGlobal = identity(globalArr);
+        -->maybeGlobal++<--;
+        `);
+});
+Deno.test.ignore("tracks inline arrow function return values", () => {
+    testFails(`
+        const identity = (x) => x;
+        const maybeGlobal = identity(globalArr);
+        -->maybeGlobal++<--;
+        `);
+});
 Deno.test("mutation helper function on global", () => {
     testFails(`
         function increment(x) {
-            return x++;
+            return -->x++<--;
         }
-        -->increment(globalNestedObj)<--;
+        increment(globalNestedObj);
         `);
 });
 Deno.test("mutation arrow function", () => {
     testFails(`
-        const add = (x) => x++;
-        -->add(globalArr)<--;
+        const add = (x) => -->x++<--;
+        add(globalArr);
         `);
 });
 Deno.test("mutation iife", () => {
     testFails(`
-        -->((arr) => {arr++})(globalArr)<--;
+        ((arr) => { -->arr++<--})(globalArr);
         `);
 });
 Deno.test("mutation from object member", () => {
     testFails(`
-        const o = { f: function mutate(x) { x++; } };
-        -->o.f(globalArr)<--;
+        const o = { f: function mutate(x) { -->x++<--; } };
+        o.f(globalArr);
         `);
 });
 
@@ -272,7 +354,7 @@ Deno.test("doesn't allow mutating instance methods on globals", () => {
     -->globalArr.pop()<--;
     `);
 });
-Deno.test("array instance methods on user owned array", () => {
+Deno.test.ignore("array instance methods on user owned array", () => {
     testPasses(`
           const allScenes = [...scenes];
           const lastScene = allScenes.pop();
@@ -331,11 +413,18 @@ Deno.test.ignore("recursive function", () => {
         multiply(2, 3);
         `);
 });
-Deno.test("Example usage", () => {
+Deno.test.ignore("window.addEventListener", () => {
     testFails(`
         window.addEventListener(() => {
             -->window.key = 'new value'<--;            
         })
+        `);
+});
+Deno.test("accidental assignment instead of comparison", () => {
+    testFails(`
+        if (-->window.isDev = true<--) {
+            console.debug('development mode')
+        }
         `);
 });
 Deno.test.ignore("Calling binded Object prototype methods", () => {

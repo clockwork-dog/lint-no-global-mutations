@@ -25,13 +25,13 @@ const editor = new EditorView({
 ```
 
 This will cause
-[the following lint error](https://clockwork-dog.github.io/lint-no-global-mutations/#d2luZG93LmFkZEV2ZW50TGlzdGVuZXIoKCkgPT4gewogIHdpbmRvdy5rZXkgPSAnbmV3IHZhbHVlJzsKfSk7Cg==):
+[the following lint error](https://clockwork-dog.github.io/lint-no-global-mutations/#aWYgKHdpbmRvdy5pc0RldiA9IHRydWUpIHsKICAgIGNvbnNvbGUuZGVidWcoJ2RldmVsb3BtZW50IG1vZGUnKQp9):
 
 ```js
-window.addEventListener(() => {
-    window.key = "new value";
-    ~~~~~~~~~~~~~~~~~~~~~~~~
-});
+if (window.isDev = true) {
+    ~~~~~~~~~~~~~~~~~~~
+    console.debug('development mode')
+}
 ```
 
 [ESLint Code Explorer](https://explorer.eslint.org/#eslint-explorer)
