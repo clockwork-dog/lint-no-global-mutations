@@ -20,13 +20,12 @@ const MUTATING_OBJECT_PROTOTYPE_METHODS = new Set(
 );
 
 export function objectCallbackMethod(
-    { node, currentRefs, allGlobalRefs, errors }: State & {
-        node: types.CallExpression & NodePos;
-    },
+    state: State & { node: types.CallExpression & NodePos },
     args: Reference[],
 ) {
+    const { node, allGlobalRefs, errors } = state;
     if (
-        getPossibleReferences(node.callee, currentRefs).get().some(
+        getPossibleReferences({ ...state, node: node.callee }).get().some(
             (method) => MUTATING_OBJECT_PROTOTYPE_METHODS.has(method),
         )
     ) {

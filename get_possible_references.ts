@@ -1,6 +1,7 @@
-import { types } from "estree-toolkit";
-import { ANY_STRING, ReferenceStack } from "./util.ts";
+import { ANY_STRING, assertIsNodePos } from "./util.ts";
 import { Reference } from "./reference.ts";
+import { evaluateCallExpression } from "./functions.ts";
+import { State } from "./main.ts";
 
 export function getAllProperties(object: unknown) {
     let obj = object;
@@ -13,15 +14,16 @@ export function getAllProperties(object: unknown) {
 }
 
 export function getPossibleReferences(
-    ex: types.Expression | types.Super | null | undefined,
-    referencesStack: ReferenceStack,
+    state: State,
 ): Reference {
+    const ex = state.node;
+    const referenceStack = state.currentRefs;
     if (!ex) return new Reference([ex]);
     switch (ex.type) {
         case "Literal":
             return new Reference([ex.value]);
         case "Identifier":
-            for (const [, references] of referencesStack) {
+            for (const [, references] of referenceStack) {
                 if (ex.name in references) {
                     return references[ex.name]!;
                 }
@@ -40,23 +42,21 @@ export function getPossibleReferences(
         case "LogicalExpression":
             // ||, &&, ??
             return new Reference([
-                ...getPossibleReferences(ex.left, referencesStack)
-                    .get(),
-                ...getPossibleReferences(ex.right, referencesStack)
-                    .get(),
+                ...getPossibleReferences({ ...state, node: ex.left }).get(),
+                ...getPossibleReferences({ ...state, node: ex.right }).get(),
             ]);
         case "ConditionalExpression":
             // condition ? a : b
             return new Reference([
-                ...getPossibleReferences(ex.consequent, referencesStack)
+                ...getPossibleReferences({ ...state, node: ex.consequent })
                     .get(),
-                ...getPossibleReferences(ex.alternate, referencesStack)
+                ...getPossibleReferences({ ...state, node: ex.alternate })
                     .get(),
             ]);
         case "AssignmentExpression":
             // a = b = {}
             // (a and b are the same reference)
-            return getPossibleReferences(ex.right, referencesStack);
+            return getPossibleReferences({ ...state, node: ex.right });
         case "UnaryExpression":
             // Operators + - ! ~ typeof void delete
             // These all return primitives
@@ -71,7 +71,7 @@ export function getPossibleReferences(
                 .filter((elem) => elem !== null)
                 .forEach((elem) => {
                     if (elem?.type === "SpreadElement") {
-                        getPossibleReferences(elem.argument, referencesStack)
+                        getPossibleReferences({ ...state, node: elem.argument })
                             .get()
                             .filter(Array.isArray)
                             .forEach((arr) => {
@@ -80,7 +80,7 @@ export function getPossibleReferences(
                                 });
                             });
                     } else {
-                        getPossibleReferences(elem, referencesStack)
+                        getPossibleReferences({ ...state, node: elem })
                             .get()
                             .forEach((p) => elements.push(p));
                     }
@@ -101,17 +101,17 @@ export function getPossibleReferences(
 
                     switch (key.type) {
                         case "Identifier":
-                            object[key.name] = getPossibleReferences(
-                                value,
-                                referencesStack,
-                            );
+                            object[key.name] = getPossibleReferences({
+                                ...state,
+                                node: value,
+                            });
                             break;
                         case "Literal":
                             if (key.raw === undefined) return;
-                            object[key.raw] = getPossibleReferences(
-                                value,
-                                referencesStack,
-                            );
+                            object[key.raw] = getPossibleReferences({
+                                ...state,
+                                node: value,
+                            });
                             break;
                         case "CallExpression":
                         case "PrivateIdentifier":
@@ -139,10 +139,10 @@ export function getPossibleReferences(
                         case "UnaryExpression":
                         case "UpdateExpression":
                         case "YieldExpression":
-                            object[ANY_STRING] = getPossibleReferences(
-                                value,
-                                referencesStack,
-                            );
+                            object[ANY_STRING] = getPossibleReferences({
+                                ...state,
+                                node: value,
+                            });
                     }
                 }
             });
@@ -156,27 +156,31 @@ export function getPossibleReferences(
                 ? ex.property.value
                 : ANY_STRING;
 
-            return getPossibleReferences(ex.object, referencesStack).getKey(
+            return getPossibleReferences(
+                { ...state, node: ex.object },
+            ).getKey(
                 p as string,
             );
         }
         case "ChainExpression":
             // Optional chaining
-            return getPossibleReferences(ex.expression, referencesStack);
+            return getPossibleReferences({ ...state, node: ex.expression });
         case "SequenceExpression":
             // const a = (b = 1, c = 2, d = 3)
             // Returns the last expression
             return getPossibleReferences(
-                ex.expressions[ex.expressions.length - 1]!,
-                referencesStack,
+                { ...state, node: ex.expressions[ex.expressions.length - 1]! },
             );
 
         // For functions we store the node to get access to params and body
         case "FunctionExpression":
         case "ArrowFunctionExpression":
             return new Reference([ex]);
+        case "CallExpression": {
+            assertIsNodePos(ex);
+            return evaluateCallExpression({ ...state, node: ex });
+        }
         case "AwaitExpression":
-        case "CallExpression":
         case "ClassExpression":
         case "ImportExpression":
         case "MetaProperty":
@@ -188,6 +192,7 @@ export function getPossibleReferences(
         case "JSXElement":
         case "JSXFragment":
         case "Super":
+        default:
             return new Reference([]);
     }
 }

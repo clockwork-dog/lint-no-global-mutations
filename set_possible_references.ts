@@ -6,6 +6,7 @@ import {
 import { Reference } from "./reference.ts";
 import { ANY_STRING, isInteger, ReferenceStack } from "./util.ts";
 import { assertGreater } from "@std/assert";
+import { State } from "./main.ts";
 
 function propertyToPathSegment(
     ex: types.MemberExpression["property"] | types.PrivateIdentifier,
@@ -96,15 +97,15 @@ export function decomposeMemberExpression(
 export function setPossibleReferences(
     left: types.MemberExpression,
     right: types.Expression,
-    refStack: ReferenceStack,
+    state: State,
 ): string | void {
-    const value = getPossibleReferences(right, refStack);
+    const value = getPossibleReferences({ ...state, node: right });
     const { root, path } = decomposeMemberExpression(left);
 
     assertGreater(path.length, 0);
     const finalSegment = path.pop()!;
 
-    const rootRef = getPossibleReferences(root, refStack);
+    const rootRef = getPossibleReferences({ ...state, node: root });
     let possibilities = rootRef.get();
 
     for (const segment of path) {

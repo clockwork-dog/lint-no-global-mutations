@@ -71,7 +71,7 @@ Deno.test("assignment to user array", () => {
 Deno.test("can't update global", () => {
     testFails("-->globalArr++<--");
 });
-Deno.test.ignore("can't delete global property", () => {
+Deno.test("can't delete global property", () => {
     testFails("-->delete globalNestedObj.a<--");
 });
 Deno.test("can update user owned array", () => {
@@ -211,14 +211,14 @@ Deno.test("nested functions", () => {
         })()`,
     );
 });
-Deno.test.ignore("tracks function return expressions", () => {
+Deno.test("tracks function return expressions", () => {
     testFails(`
         function identity(x) { return x }
         const maybeGlobal = identity(globalArr);
         -->maybeGlobal++<--;
         `);
 });
-Deno.test.ignore("tracks inline arrow function return values", () => {
+Deno.test("tracks inline arrow function return values", () => {
     testFails(`
         const identity = (x) => x;
         const maybeGlobal = identity(globalArr);
@@ -354,7 +354,7 @@ Deno.test("doesn't allow mutating instance methods on globals", () => {
     -->globalArr.pop()<--;
     `);
 });
-Deno.test.ignore("array instance methods on user owned array", () => {
+Deno.test("array instance methods on user owned array", () => {
     testPasses(`
           const allScenes = [...scenes];
           const lastScene = allScenes.pop();

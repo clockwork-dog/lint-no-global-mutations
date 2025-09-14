@@ -2,9 +2,7 @@ import { traverse, types } from "estree-toolkit";
 import { constructHoistedScopes } from "./scopes.ts";
 import {
     assertIsNodePos,
-    FunctionNode,
     functionTypes,
-    isFnNode,
     LintingError,
     References,
     ReferenceStack,
@@ -14,12 +12,10 @@ import { getPossibleReferences } from "./get_possible_references.ts";
 import { Reference } from "./reference.ts";
 import { collectDeepReferences } from "./deep_references.ts";
 import { setPossibleReferences } from "./set_possible_references.ts";
-import { evaluateFunction } from "./functions.ts";
-import { arrayCallbackMethod } from "./array.ts";
-import { objectCallbackMethod } from "./object.ts";
+import { evaluateCallExpression } from "./functions.ts";
 
 export interface State {
-    node: types.Node;
+    node: types.Node | null | undefined;
     currentRefs: ReferenceStack;
     hoistedRefStacks: Record<string | number, ReferenceStack>;
     allGlobalRefs: Set<unknown>;
@@ -80,6 +76,13 @@ export function noMutationRecursive(
     errors: LintingError[],
 ): Reference {
     const currentRefs = refsStack;
+    const state: State = {
+        node: code,
+        currentRefs,
+        hoistedRefStacks,
+        allGlobalRefs: allSchemaRefs,
+        errors,
+    };
     const returnValue = new Reference();
 
     // Completely ignore all code inside function bodies as it will be checked when invoked.
@@ -136,6 +139,15 @@ export function noMutationRecursive(
                 if (ignoreIfInsideFunctionBody()) return;
                 assertIsNodePos(path.node);
                 currentRefs.unshift([path.node, {}]);
+
+                // Arrow function with implied return
+                if (path.node.body.type !== "BlockStatement") {
+                    const val = getPossibleReferences({
+                        ...state,
+                        node: path.node.body,
+                    });
+                    returnValue.set(val);
+                }
             },
             leave() {
                 currentRefs.shift();
@@ -158,7 +170,10 @@ export function noMutationRecursive(
             if (ignoreIfInsideFunctionBody()) return;
             const node = path?.node;
             assertIsNodePos(node);
-            const val = getPossibleReferences(node.argument, currentRefs);
+            const val = getPossibleReferences({
+                ...state,
+                node: node.argument,
+            });
             returnValue.set(val);
         },
 
@@ -167,7 +182,7 @@ export function noMutationRecursive(
             const node = path?.node;
             assertIsNodePos(node);
             if (
-                getPossibleReferences(node.argument, currentRefs)
+                getPossibleReferences({ ...state, node: node.argument })
                     .get()
                     .some((ref) => allSchemaRefs.has(ref))
             ) {
@@ -189,7 +204,10 @@ export function noMutationRecursive(
                 node.argument.type === "MemberExpression"
             ) {
                 if (
-                    getPossibleReferences(node.argument.object, currentRefs)
+                    getPossibleReferences({
+                        ...state,
+                        node: node.argument.object,
+                    })
                         .get()
                         .some((ref) => allSchemaRefs.has(ref))
                 ) {
@@ -218,11 +236,14 @@ export function noMutationRecursive(
             }
 
             const possibleMutations = node.left.type === "Identifier"
-                ? getPossibleReferences(node.left, currentRefs).get()
+                ? getPossibleReferences({ ...state, node: node.left }).get()
                 : [
-                    ...getPossibleReferences(node.left, currentRefs)
+                    ...getPossibleReferences({ ...state, node: node.left })
                         .get(),
-                    ...getPossibleReferences(node.left.object, currentRefs)
+                    ...getPossibleReferences({
+                        ...state,
+                        node: node.left.object,
+                    })
                         .get(),
                 ];
             if (possibleMutations.some((ref) => allSchemaRefs.has(ref))) {
@@ -234,7 +255,7 @@ export function noMutationRecursive(
                 );
             }
 
-            const value = getPossibleReferences(node.right, currentRefs);
+            const value = getPossibleReferences({ ...state, node: node.right });
             switch (node.left.type) {
                 case "Identifier":
                     for (const [, refs] of currentRefs) {
@@ -245,7 +266,7 @@ export function noMutationRecursive(
                     }
                     break;
                 case "MemberExpression":
-                    setPossibleReferences(node.left, node.right, currentRefs);
+                    setPossibleReferences(node.left, node.right, state);
                     break;
                 default:
                     throw new Error("TODO!");
@@ -264,10 +285,10 @@ export function noMutationRecursive(
                     case "Identifier": {
                         // Keep track of all the possibilities of the init
                         const [, scope] = currentRefs[0]!;
-                        scope[id.name] = getPossibleReferences(
-                            init,
-                            currentRefs,
-                        );
+                        scope[id.name] = getPossibleReferences({
+                            ...state,
+                            node: init,
+                        });
                         break;
                     }
                     case "ObjectPattern":
@@ -284,60 +305,13 @@ export function noMutationRecursive(
             if (ignoreIfInsideFunctionBody()) return;
             const node = path.node;
             assertIsNodePos(node);
-            const args = node.arguments.map((arg) => {
-                if (arg.type === "SpreadElement") {
-                    throw new Error("TODO: spread");
-                }
-                return getPossibleReferences(arg, currentRefs);
-            });
-
-            arrayCallbackMethod({
-                node: node,
-                currentRefs,
+            returnValue.set(evaluateCallExpression({
+                node,
                 allGlobalRefs: allSchemaRefs,
-                hoistedRefStacks,
-                errors,
-            }, args);
-
-            objectCallbackMethod({
-                node: node,
                 currentRefs,
-                allGlobalRefs: allSchemaRefs,
-                hoistedRefStacks,
                 errors,
-            }, args);
-
-            // Check for user functions
-            const possibleFns: FunctionNode[] = [];
-            switch (node.callee.type) {
-                case "FunctionExpression":
-                case "ArrowFunctionExpression":
-                    possibleFns.push(node.callee);
-                    break;
-                default:
-                    possibleFns.push(
-                        ...getPossibleReferences(
-                            node.callee,
-                            currentRefs,
-                        ).get() as FunctionNode[],
-                    );
-                    break;
-            }
-
-            possibleFns.forEach(
-                (fnNode) => {
-                    if (!isFnNode(fnNode)) {
-                        return;
-                    }
-                    evaluateFunction({
-                        node: fnNode,
-                        currentRefs,
-                        hoistedRefStacks: hoistedRefStacks,
-                        allGlobalRefs: allSchemaRefs,
-                        errors,
-                    }, args);
-                },
-            );
+                hoistedRefStacks,
+            }));
         },
     });
     return returnValue;

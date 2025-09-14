@@ -22,23 +22,21 @@ const MUTATING_ARRAY_INSTANCE_METHODS = new Set(
 );
 
 export function arrayCallbackMethod(
-    { node, currentRefs, allGlobalRefs, errors }: State & {
-        node: types.CallExpression & NodePos;
-    },
+    state: State & { node: types.CallExpression & NodePos },
     _args: Reference[],
 ) {
+    const { node, allGlobalRefs, errors } = state;
     // Check if mutating array method on global
     if (node.callee.type === "MemberExpression") {
         const { object } = node.callee;
         if (
-            getPossibleReferences(node.callee, currentRefs).get().some(
-                (method) => MUTATING_ARRAY_INSTANCE_METHODS.has(method as any),
-            )
+            getPossibleReferences({ ...state, node: node.callee }).get()
+                .some(
+                    (method) =>
+                        MUTATING_ARRAY_INSTANCE_METHODS.has(method as any),
+                )
         ) {
-            getPossibleReferences(
-                object,
-                currentRefs,
-            )
+            getPossibleReferences({ ...state, node: object })
                 .get()
                 .filter(Array.isArray)
                 .filter((arr) => allGlobalRefs.has(arr))
