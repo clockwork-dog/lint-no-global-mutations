@@ -150,16 +150,18 @@ export function getPossibleReferences(
         }
         case "MemberExpression": {
             if (ex.object.type === "Super") return new Reference();
-            const p = ex.property.type === "Identifier"
-                ? ex.property.name
-                : ex.property.type === "Literal"
-                ? ex.property.value
-                : ANY_STRING;
+            let property: string | number | symbol;
 
-            return getPossibleReferences(
-                { ...state, node: ex.object },
-            ).getKey(
-                p as string,
+            if (ex.property.type === "Identifier" && !ex.computed) {
+                property = ex.property.name;
+            } else if (ex.property.type === "Literal") {
+                property = ex.property.value as any;
+            } else {
+                property = ANY_STRING;
+            }
+
+            return getPossibleReferences({ ...state, node: ex.object }).getKey(
+                property,
             );
         }
         case "ChainExpression":

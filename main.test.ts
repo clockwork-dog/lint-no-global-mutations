@@ -162,7 +162,7 @@ Deno.test("uncalled arrow function expressions are ignored", () => {
         };
         `);
 });
-Deno.test("called function declarations error", () => {
+Deno.test("function declaration call error", () => {
     testFails(`
         function a() {
             -->globalArr++<--;
@@ -170,7 +170,7 @@ Deno.test("called function declarations error", () => {
         a();
         `);
 });
-Deno.test("called function expressions error", () => {
+Deno.test("function expression call error", () => {
     testFails(`
         const a = function() {
             -->globalArr++<--;
@@ -178,7 +178,7 @@ Deno.test("called function expressions error", () => {
         a();
         `);
 });
-Deno.test("called arrow function expressions error", () => {
+Deno.test("arrow function expression call error", () => {
     testFails(`
         const a =() => {
             -->globalArr++<--;
@@ -204,7 +204,7 @@ Deno.test("failing variable shadowing example", () => {
         pushZero(window);
         `);
 });
-Deno.test("nested functions", () => {
+Deno.test("nested iifes", () => {
     testFails(
         `(() => {
           (() => { -->globalArr++<-- })()
@@ -223,6 +223,26 @@ Deno.test("tracks inline arrow function return values", () => {
         const identity = (x) => x;
         const maybeGlobal = identity(globalArr);
         -->maybeGlobal++<--;
+        `);
+});
+Deno.test("Array.forEach element mutation", () => {
+    testFails(`
+        [globalArr, globalObj].forEach((element) => {
+            -->element++<--;
+        });
+        `);
+});
+Deno.test("Array.forEach array index mutation", () => {
+    testFails(`
+        [globalArr, globalObj].forEach((element, index, arr) => {
+            -->arr[index]++<--;
+        });
+        `);
+});
+Deno.test.ignore("Array.map keeping references", () => {
+    testFails(`
+    const myArr = [globalArr, globalObj].map((elem) => elem);
+    -->myArr[0]++<--;
         `);
 });
 Deno.test("mutation helper function on global", () => {
