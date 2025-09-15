@@ -225,9 +225,9 @@ Deno.test("tracks inline arrow function return values", () => {
         -->maybeGlobal++<--;
         `);
 });
-Deno.test("Array.forEach element mutation", () => {
+Deno.test("Array.findIndex element mutation", () => {
     testFails(`
-        [globalArr, globalObj].forEach((element) => {
+        [globalArr, globalObj].findIndex((element) => {
             -->element++<--;
         });
         `);
@@ -239,9 +239,15 @@ Deno.test("Array.forEach array index mutation", () => {
         });
         `);
 });
-Deno.test.ignore("Array.map keeping references", () => {
+Deno.test("Array.map keeping references", () => {
     testFails(`
     const myArr = [globalArr, globalObj].map((elem) => elem);
+    -->myArr[0]++<--;
+        `);
+});
+Deno.test("Array.filter references", () => {
+    testFails(`
+    const myArr = [globalArr, globalObj].filter(() => Math.random() > 0.5);
     -->myArr[0]++<--;
         `);
 });
