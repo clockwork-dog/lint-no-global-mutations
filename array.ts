@@ -74,7 +74,23 @@ const CALLBACK_ARRAY_INSTANCE_METHODS = new Map<Function, CallbackHandler>([
         return new Reference([undefined, ANY_STRING]);
     }],
     [[].flatMap, (state) => {
-        throw new Error("TODO");
+        const returnValues: Reference[] = [];
+        const callback = state.node.arguments[0]!;
+        assertIsFnNode(callback);
+        const array = getPossibleReferences({
+            ...state,
+            node: state.node.callee.object,
+        });
+        const index = new Reference([ANY_STRING]);
+        const element = array.getKey(ANY_STRING);
+
+        returnValues.push(evaluateFnNode({ ...state, node: callback }, [
+            element,
+            index,
+            array,
+        ]));
+
+        return new Reference(returnValues);
     }],
     [[].forEach, (state) => {
         elemIndexArrCallback(state);

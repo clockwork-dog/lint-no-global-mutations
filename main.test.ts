@@ -245,6 +245,12 @@ Deno.test("Array.map keeping references", () => {
     -->myArr[0]++<--;
         `);
 });
+Deno.test("Array.flatMap keeping references", () => {
+    testFails(`
+    const myArr = [[globalNestedArr]].flatMap((elem) => elem);
+    -->myArr[0]++<--;
+        `);
+});
 Deno.test("Array.filter references", () => {
     testFails(`
     const myArr = [globalArr, globalObj].filter(() => Math.random() > 0.5);
