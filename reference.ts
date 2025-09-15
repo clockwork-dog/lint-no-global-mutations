@@ -4,15 +4,16 @@ import { ANY_STRING, isInteger } from "./util.ts";
 export class Reference {
     constructor(possibilities: Iterable<unknown> = []) {
         for (const possibility of possibilities) {
-            this._possibilities.push(possibility);
+            this._possibilities.add(possibility);
         }
     }
 
-    private _possibilities: unknown[] = [];
+    private _possibilities: Set<unknown> = new Set();
 
     get() {
         return Reference.unwrap(this);
     }
+
     public getKey(key: string | symbol | number) {
         const possibilities: unknown[] = [];
         for (const poss of this.get()) {
@@ -41,10 +42,10 @@ export class Reference {
 
     set(value: unknown) {
         const possibilities = this.get();
-        this._possibilities = [...possibilities, value];
+        this._possibilities = new Set([...possibilities, value]);
     }
     public setKey(key: string | symbol | number, value: unknown) {
-        const possibilities: unknown[] = [];
+        const possibilities: Set<unknown> = new Set();
         for (const poss of this.get()) {
             if (typeof poss === "object" && poss !== null) {
                 (poss as any)[key] = new Reference([
@@ -52,7 +53,7 @@ export class Reference {
                     value,
                 ]);
             }
-            possibilities.push(poss);
+            possibilities.add(poss);
         }
         this._possibilities = possibilities;
     }

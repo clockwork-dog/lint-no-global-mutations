@@ -181,6 +181,10 @@ export function noMutationRecursive(
             if (ignoreIfInsideFunctionBody()) return;
             const node = path?.node;
             assertIsNodePos(node);
+            console.log(
+                getPossibleReferences({ ...state, node: node.argument })
+                    .get(),
+            );
             if (
                 getPossibleReferences({ ...state, node: node.argument })
                     .get()
