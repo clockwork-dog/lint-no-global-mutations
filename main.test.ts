@@ -245,10 +245,30 @@ Deno.test("Array.map keeping references", () => {
     -->myArr[0]++<--;
         `);
 });
+Deno.test("Array.map with helper fn", () => {
+    testFails(`
+    const identity = (x) => x;
+    const myArr = [globalArr, globalObj].map(identity);
+    -->myArr[0]++<--;
+        `);
+});
 Deno.test("Array.flatMap keeping references", () => {
     testFails(`
     const myArr = [[globalNestedArr]].flatMap((elem) => elem);
     -->myArr[0]++<--;
+        `);
+});
+Deno.test("Array.reduce", () => {
+    testPasses(`
+        const max = (a, b) => Math.max(a, b);
+        [1, 2, 3, 4].reduce(max);
+        `);
+});
+Deno.test("Array.reduce keeps references", () => {
+    testFails(`
+        const first = (a, b) => a;
+        const val = [globalArr, globalObj].reduce(first);
+        -->val++<--;
         `);
 });
 Deno.test("Array.filter references", () => {
