@@ -126,8 +126,8 @@ const syncURL = ViewPlugin.fromClass(
 );
 
 const GLOBALS = {
-    globalObj: {},
-    globalArr: [],
+    globalObj: { a: { b: { c: {} } } },
+    globalArr: [[[[]]]],
     window: { key: "value" },
 };
 
