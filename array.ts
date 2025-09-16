@@ -11,31 +11,15 @@ import {
 } from "./util.ts";
 import { evaluateFnNode } from "./functions.ts";
 
-const MUTATING_ARRAY_INSTANCE_METHOD_NAMES = [
-    "copyWithin",
-    "fill",
-    "pop",
-    "push",
-    "reverse",
-    "shift",
-    "sort",
-    "splice",
-    "unshift",
-];
-const MUTATING_ARRAY_INSTANCE_METHODS = new Set(
-    MUTATING_ARRAY_INSTANCE_METHOD_NAMES.map((methodName: any) =>
-        [][methodName]
-    ),
-);
 type MemberCallExpression = types.Node & {
     type: "CallExpression";
     callee: { type: "MemberExpression" };
 };
 type CallbackHandler = (
-    state: State & { node: MemberCallExpression },
+    state: State & { node: MemberCallExpression & NodePos },
 ) => Reference;
 const elemIndexArrCallback = (
-    state: State & { node: MemberCallExpression },
+    state: State & { node: MemberCallExpression & NodePos },
 ): [Reference, Reference, Reference] => {
     const array = getPossibleReferences({
         ...state,
@@ -57,10 +41,39 @@ const elemIndexArrCallback = (
 
     return [element, index, array];
 };
-const CALLBACK_ARRAY_INSTANCE_METHODS = new Map<Function, CallbackHandler>([
+const mutatingMethod = (
+    state: State & { node: MemberCallExpression & NodePos },
+): Reference => {
+    const array = getPossibleReferences({
+        ...state,
+        node: state.node.callee.object,
+    });
+    if (array.get().some((arr) => state.allGlobalRefs.has(arr))) {
+        state.errors.push(
+            LintingError.fromNode(
+                "Can't call mutating array instance method on global",
+                state.node,
+            ),
+        );
+    }
+    return array;
+};
+const ARRAY_INSTANCE_METHODS = new Map<Function, CallbackHandler>([
+    [[].copyWithin, (state) => {
+        return mutatingMethod(state);
+    }],
     [[].every, (state) => {
         elemIndexArrCallback(state);
         return new Reference([true, false]);
+    }],
+    [[].fill, (state) => {
+        const arr = mutatingMethod(state);
+        const arg = getPossibleReferences({
+            ...state,
+            node: state.node.arguments[0],
+        });
+        arr.setKey(ANY_STRING, arg);
+        return arr;
     }],
     [[].filter, (state) => {
         const [_element, _index, array] = elemIndexArrCallback(state);
@@ -130,6 +143,20 @@ const CALLBACK_ARRAY_INSTANCE_METHODS = new Map<Function, CallbackHandler>([
 
         return new Reference([returnValues]);
     }],
+    [[].pop, (state) => {
+        const array = mutatingMethod(state);
+        const element = array.getKey(ANY_STRING);
+        return element;
+    }],
+    [[].push, (state) => {
+        const arr = mutatingMethod(state);
+        state.node.arguments.forEach((arg) => {
+            if (arg.type === "SpreadElement") throw new Error("TODO");
+            const val = getPossibleReferences({ ...state, node: arg });
+            arr.setKey(ANY_STRING, val);
+        });
+        return new Reference([ANY_STRING]);
+    }],
     [[].reduce, (state) => {
         const returnValue = new Reference();
         const array = getPossibleReferences({
@@ -183,9 +210,43 @@ const CALLBACK_ARRAY_INSTANCE_METHODS = new Map<Function, CallbackHandler>([
             array,
         ]);
     }],
+    [[].reverse, (state) => {
+        return mutatingMethod(state);
+    }],
+    [[].shift, (state) => {
+        const arr = mutatingMethod(state);
+        state.node.arguments.forEach((arg) => {
+            if (arg.type === "SpreadElement") throw new Error("TODO");
+            const val = getPossibleReferences({ ...state, node: arg });
+            arr.setKey(ANY_STRING, val);
+        });
+        return new Reference([ANY_STRING]);
+    }],
     [[].some, (state) => {
         elemIndexArrCallback(state);
         return new Reference([true, false]);
+    }],
+    [[].sort, (state) => {
+        return mutatingMethod(state);
+    }],
+    [[].splice, (state) => {
+        const arr = mutatingMethod(state);
+        state.node.arguments.forEach((arg, index) => {
+            if (index < 2) return; // first 2 args are from and to
+            if (arg.type === "SpreadElement") throw new Error("TODO");
+            const val = getPossibleReferences({ ...state, node: arg });
+            arr.setKey(ANY_STRING, val);
+        });
+        return arr;
+    }],
+    [[].unshift, (state) => {
+        const arr = mutatingMethod(state);
+        state.node.arguments.forEach((arg) => {
+            if (arg.type === "SpreadElement") throw new Error("TODO");
+            const val = getPossibleReferences({ ...state, node: arg });
+            arr.setKey(ANY_STRING, val);
+        });
+        return new Reference([ANY_STRING]);
     }],
 ]);
 
@@ -194,39 +255,19 @@ export function arrayCallbackMethod(
     _args: Reference[],
 ): Reference {
     const returnValue = new Reference();
-    const { node, allGlobalRefs, errors } = state;
-    if (node.callee.type === "MemberExpression") {
-        const { object } = node.callee;
-
+    if (state.node.callee.type === "MemberExpression") {
         // Check if mutating array method on global ~ globalArr.pop()
-        if (
-            getPossibleReferences({ ...state, node: node.callee }).get()
-                .some(
-                    (method) =>
-                        MUTATING_ARRAY_INSTANCE_METHODS.has(method as any),
-                )
-        ) {
-            getPossibleReferences({ ...state, node: object })
-                .get()
-                .filter(Array.isArray)
-                .filter((arr) => allGlobalRefs.has(arr))
-                .forEach(() => {
-                    errors.push(
-                        LintingError.fromNode("STOP THAT!", node),
-                    );
-                });
-        }
-
         // Check if callback will get reference to array element ~ globalArr.map(x => x++);
-        getPossibleReferences({ ...state, node: node.callee }).get().forEach(
-            (ref) => {
-                const method = CALLBACK_ARRAY_INSTANCE_METHODS.get(
-                    ref as any,
-                );
-                if (!method) return;
-                returnValue.set(method(state as any));
-            },
-        );
+        getPossibleReferences({ ...state, node: state.node.callee }).get()
+            .forEach(
+                (ref) => {
+                    const method = ARRAY_INSTANCE_METHODS.get(
+                        ref as any,
+                    );
+                    if (!method) return;
+                    returnValue.set(method(state as any));
+                },
+            );
     }
     return returnValue;
 }

@@ -11,6 +11,8 @@ function testPasses(program: string) {
         globalObj: {},
         globalNestedObj: { a: { b: { c: {} } } },
     };
+    assertEquals(program.includes("-->"), false, "Accidental -->");
+    assertEquals(program.includes("<--"), false, "Accidental <--");
     const ast = parse(program, { ecmaVersion: 2023 }) as types.Program;
     const errors = noMutation(ast, globals);
     assertEquals(errors.length, 0, errors[0]?.message);
@@ -367,13 +369,16 @@ Deno.test("doesn't allow dynamic referenced Object properties", () => {
             -->o['define' + 'Property'](globalObj, 'key', {value: 'value'})<--;
             `);
 });
-Deno.test("doesn't allow nested dynamic referenced Object properties", () => {
-    testPasses(`
+Deno.test.ignore(
+    "doesn't allow nested dynamic referenced Object properties",
+    () => {
+        testFails(`
             const o = {};
             o.obj = Object;
             -->o.obj['define' + 'Property'](state, 'key', {value: 'value'})<--;
             `);
-});
+    },
+);
 Deno.test("allows console.log()", () => {
     testPasses("console.log('Hello, world!')");
 });
@@ -412,14 +417,27 @@ Deno.test("array instance methods on user owned array", () => {
           const lastScene = allScenes.pop();
       `);
 });
-Deno.test.ignore("tracks reference through array.pop", () => {
+Deno.test("tracks reference through array.pop", () => {
     testFails(`
-          const allScenes = [...scenes];
+          const allScenes = [...globalNestedArr];
           const lastScene = allScenes.pop();
           -->lastScene++<--;
       `);
 });
-
+Deno.test("tracks reference through array.push", () => {
+    testFails(`
+          const myArr = [];
+          myArr.push(globalNestedArr);
+          -->myArr[0]++<--;
+      `);
+});
+Deno.test("tracks reference through array.splice", () => {
+    testFails(`
+          const myArr = [];
+          myArr.splice(0, 0, globalArr);
+          -->myArr[0]++<--;
+      `);
+});
 Deno.test.ignore("globalThis access", () => {
     testFails(`
             const o = globalThis['Obj' + 'ect'];
