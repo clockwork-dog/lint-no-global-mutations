@@ -37,11 +37,17 @@ Deno.test("can inspect deep references", () => {
     );
 });
 
-Deno.test("can set values", () => {
+Deno.test("can set object values", () => {
     const a = { key: "value" };
     const ref = new Reference([a]);
     ref.setKey("key", "new-value");
     assertEquals(ref.getKey("key").get(), ["value", "new-value"]);
+});
+Deno.test("can set array elements", () => {
+    const a = [1, 2, 3];
+    const ref = new Reference([a]);
+    ref.setKey(ANY_STRING, 4);
+    assertArrayIncludes(ref.getKey(0).get(), [1, 2, 3, 4]);
 });
 
 Deno.test("can lookup ANY_STRING", () => {

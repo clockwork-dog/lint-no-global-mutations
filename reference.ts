@@ -47,7 +47,9 @@ export class Reference {
     public setKey(key: string | symbol | number, value: unknown) {
         const possibilities: Set<unknown> = new Set();
         for (const poss of this.get()) {
-            if (typeof poss === "object" && poss !== null) {
+            if (Array.isArray(poss)) {
+                poss.push(value);
+            } else if (typeof poss === "object" && poss !== null) {
                 (poss as any)[key] = new Reference([
                     (poss as any)[key],
                     value,

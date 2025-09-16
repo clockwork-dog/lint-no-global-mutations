@@ -44,6 +44,8 @@ export const isInteger = (n: unknown) => {
             return Number.isInteger(n);
         case "string":
             return n === String(parseInt(n, 10));
+        case "symbol":
+            return n === ANY_STRING;
     }
 };
 
