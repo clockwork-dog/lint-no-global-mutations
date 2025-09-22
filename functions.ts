@@ -47,8 +47,8 @@ export function evaluateCallExpression(
         });
 
     // Handle array prototype and object instance methods
-    returnValue.set(arrayCallbackMethod(state, args));
-    returnValue.set(objectCallbackMethod(state, args));
+    returnValue.set(arrayCallbackMethod(state));
+    returnValue.set(objectCallbackMethod(state));
 
     return returnValue;
 }

@@ -252,7 +252,6 @@ const ARRAY_INSTANCE_METHODS = new Map<Function, CallbackHandler>([
 
 export function arrayCallbackMethod(
     state: State & { node: types.CallExpression & NodePos },
-    _args: Reference[],
 ): Reference {
     const returnValue = new Reference();
     if (state.node.callee.type === "MemberExpression") {
