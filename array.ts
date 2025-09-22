@@ -48,14 +48,18 @@ const mutatingMethod = (
         ...state,
         node: state.node.callee.object,
     });
-    if (array.get().some((arr) => state.allGlobalRefs.has(arr))) {
-        state.errors.push(
-            LintingError.fromNode(
-                "Can't call mutating array instance method on global",
-                state.node,
-            ),
-        );
-    }
+    array.get()
+        .map((arr) => state.allGlobalRefs.get(arr))
+        .filter(Boolean)
+        .forEach((path) => {
+            state.errors.push(
+                LintingError.fromNode(
+                    `Can't call mutating array instance method on ${path}`,
+                    state.node,
+                ),
+            );
+        });
+
     return array;
 };
 const ARRAY_INSTANCE_METHODS = new Map<Function, CallbackHandler>([

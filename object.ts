@@ -23,15 +23,30 @@ const getTarget = (
     return target;
 };
 
+const mutatesTarget = (
+    target: Reference,
+    state: State & { node: types.CallExpression & NodePos },
+) => {
+    target.get()
+        .map((ref) => state.allGlobalRefs.get(ref))
+        .filter(Boolean)
+        .forEach((path) => {
+            state.errors.push(
+                LintingError.fromNode(
+                    `Cannot call mutating Object prototype method on ${path}`,
+                    state.node,
+                ),
+            );
+        });
+};
+
 type CallbackHandler = (
     state: State & { node: types.CallExpression & NodePos },
 ) => Reference;
 const OBJECT_PROTOTYPE_METHODS: Map<Function, CallbackHandler> = new Map([
     [Object.assign, (state) => {
         const target = getTarget(state);
-        if (target.get().filter((ref) => state.allGlobalRefs.has(ref))) {
-            state.errors.push(LintingError.fromNode("STOP!", state.node));
-        }
+        mutatesTarget(target, state);
         return target;
     }],
     [Object.create, (_state) => {
@@ -39,16 +54,12 @@ const OBJECT_PROTOTYPE_METHODS: Map<Function, CallbackHandler> = new Map([
     }],
     [Object.defineProperties, (state) => {
         const target = getTarget(state);
-        if (target.get().filter((ref) => state.allGlobalRefs.has(ref))) {
-            state.errors.push(LintingError.fromNode("STOP!", state.node));
-        }
+        mutatesTarget(target, state);
         return target;
     }],
     [Object.defineProperty, (state) => {
         const target = getTarget(state);
-        if (target.get().filter((ref) => state.allGlobalRefs.has(ref))) {
-            state.errors.push(LintingError.fromNode("STOP!", state.node));
-        }
+        mutatesTarget(target, state);
         return target;
     }],
     [Object.entries, (state) => {
@@ -59,9 +70,7 @@ const OBJECT_PROTOTYPE_METHODS: Map<Function, CallbackHandler> = new Map([
     }],
     [Object.freeze, (state) => {
         const target = getTarget(state);
-        if (target.get().filter((ref) => state.allGlobalRefs.has(ref))) {
-            state.errors.push(LintingError.fromNode("STOP!", state.node));
-        }
+        mutatesTarget(target, state);
         return target;
     }],
     [Object.fromEntries, (state) => {
@@ -119,23 +128,17 @@ const OBJECT_PROTOTYPE_METHODS: Map<Function, CallbackHandler> = new Map([
     }],
     [Object.preventExtensions, (state) => {
         const target = getTarget(state);
-        if (target.get().filter((ref) => state.allGlobalRefs.has(ref))) {
-            state.errors.push(LintingError.fromNode("STOP!", state.node));
-        }
+        mutatesTarget(target, state);
         return target;
     }],
     [Object.seal, (state) => {
         const target = getTarget(state);
-        if (target.get().filter((ref) => state.allGlobalRefs.has(ref))) {
-            state.errors.push(LintingError.fromNode("STOP!", state.node));
-        }
+        mutatesTarget(target, state);
         return target;
     }],
     [Object.setPrototypeOf, (state) => {
         const target = getTarget(state);
-        if (target.get().filter((ref) => state.allGlobalRefs.has(ref))) {
-            state.errors.push(LintingError.fromNode("STOP!", state.node));
-        }
+        mutatesTarget(target, state);
         return target;
     }],
     [Object.values, (state) => {

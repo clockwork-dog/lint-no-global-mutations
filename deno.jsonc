@@ -7,7 +7,8 @@
             "deno.window",
             "esnext",
             "dom"
-        ]
+        ],
+        "types": ["index.d.ts"]
     },
     "tasks": {
         "build:playground": {

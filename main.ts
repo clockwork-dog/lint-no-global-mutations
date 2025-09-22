@@ -18,7 +18,7 @@ export interface State {
     node: types.Node | null | undefined;
     currentRefs: ReferenceStack;
     hoistedRefStacks: Record<string | number, ReferenceStack>;
-    allGlobalRefs: Set<unknown>;
+    allGlobalRefs: Map<unknown, string>;
     errors: LintingError[];
 }
 
@@ -26,7 +26,7 @@ export function noMutation(
     program: types.Program,
     schemaObj: any,
 ): LintingError[] {
-    const allSchemaRefs = collectDeepReferences(schemaObj);
+    const allGlobalRefs = collectDeepReferences(schemaObj);
     // Construct global scope
     // Get the current scope stack and attach empty reference arrays
     // These will be populated with possible global references later
@@ -57,7 +57,7 @@ export function noMutation(
         program,
         currentRefs,
         hoistedRefs,
-        allSchemaRefs,
+        allGlobalRefs,
         errors,
     );
 
@@ -72,7 +72,7 @@ export function noMutationRecursive(
         | types.ArrowFunctionExpression,
     refsStack: ReferenceStack,
     hoistedRefStacks: Record<number, ReferenceStack>,
-    allSchemaRefs: Set<unknown>,
+    allGlobalRefs: Map<unknown, string>,
     errors: LintingError[],
 ): Reference {
     const currentRefs = refsStack;
@@ -80,7 +80,7 @@ export function noMutationRecursive(
         node: code,
         currentRefs,
         hoistedRefStacks,
-        allGlobalRefs: allSchemaRefs,
+        allGlobalRefs,
         errors,
     };
     const returnValue = new Reference();
@@ -181,19 +181,21 @@ export function noMutationRecursive(
             if (ignoreIfInsideFunctionBody()) return;
             const node = path?.node;
             assertIsNodePos(node);
-
-            if (
-                getPossibleReferences({ ...state, node: node.argument })
-                    .get()
-                    .some((ref) => allSchemaRefs.has(ref))
-            ) {
-                errors.push(
-                    LintingError.fromNode(
-                        "Cannot mutate global variable",
-                        node,
-                    ),
-                );
-            }
+            getPossibleReferences({
+                ...state,
+                node: node.argument,
+            })
+                .get()
+                .map((ref) => allGlobalRefs.get(ref))
+                .filter(Boolean)
+                .forEach((path) => {
+                    errors.push(
+                        LintingError.fromNode(
+                            `Cannot mutate global variable ${path}`,
+                            node,
+                        ),
+                    );
+                });
         },
 
         UnaryExpression(path) {
@@ -204,21 +206,21 @@ export function noMutationRecursive(
                 node.operator === "delete" &&
                 node.argument.type === "MemberExpression"
             ) {
-                if (
-                    getPossibleReferences({
-                        ...state,
-                        node: node.argument.object,
-                    })
-                        .get()
-                        .some((ref) => allSchemaRefs.has(ref))
-                ) {
-                    errors.push(
-                        LintingError.fromNode(
-                            "Cannot mutate global variable",
-                            node,
-                        ),
-                    );
-                }
+                getPossibleReferences({
+                    ...state,
+                    node: node.argument.object,
+                })
+                    .get()
+                    .map((ref) => allGlobalRefs.get(ref))
+                    .filter(Boolean)
+                    .forEach((path) => {
+                        errors.push(
+                            LintingError.fromNode(
+                                `Cannot mutate global variable ${path}`,
+                                node,
+                            ),
+                        );
+                    });
             }
         },
 
@@ -247,14 +249,18 @@ export function noMutationRecursive(
                     })
                         .get(),
                 ];
-            if (possibleMutations.some((ref) => allSchemaRefs.has(ref))) {
-                errors.push(
-                    LintingError.fromNode(
-                        "Cannot reassign global",
-                        node,
-                    ),
-                );
-            }
+
+            possibleMutations
+                .map((ref) => allGlobalRefs.get(ref))
+                .filter(Boolean)
+                .forEach((path) => {
+                    errors.push(
+                        LintingError.fromNode(
+                            `Cannot mutate global variable ${path}`,
+                            node,
+                        ),
+                    );
+                });
 
             const value = getPossibleReferences({ ...state, node: node.right });
             switch (node.left.type) {
@@ -308,7 +314,7 @@ export function noMutationRecursive(
             assertIsNodePos(node);
             returnValue.set(evaluateCallExpression({
                 node,
-                allGlobalRefs: allSchemaRefs,
+                allGlobalRefs,
                 currentRefs,
                 errors,
                 hoistedRefStacks,

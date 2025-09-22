@@ -4,7 +4,7 @@ import {
     getPossibleReferences,
 } from "./get_possible_references.ts";
 import { Reference } from "./reference.ts";
-import { ANY_STRING, isInteger, ReferenceStack } from "./util.ts";
+import { ANY_STRING, isInteger } from "./util.ts";
 import { assertGreater } from "@std/assert";
 import { State } from "./main.ts";
 

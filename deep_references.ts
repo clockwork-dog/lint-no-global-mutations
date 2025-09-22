@@ -1,17 +1,34 @@
-export function collectDeepReferences(obj: unknown, refs = new Set<unknown>()) {
+export const pathToString = (path: string[]): string => {
+    return path.map((segment) => {
+        if (segment.match(/^\w+$/)) {
+            return `.${segment}`;
+        } else {
+            return `["${segment}"]`;
+        }
+    }).join("").replace(/^\./, "");
+};
+
+export function collectDeepReferences(
+    obj: unknown,
+    refs = new Map<unknown, string>(),
+    path: string[] = [],
+) {
     if (typeof obj === "object" && obj !== null) {
-        refs.add(obj);
+        refs.set(obj, pathToString(path));
 
         if (Array.isArray(obj)) {
-            obj.forEach((child) => {
+            obj.forEach((child, index) => {
                 if (!refs.has(child)) {
-                    collectDeepReferences(child, refs);
+                    collectDeepReferences(child, refs, [
+                        ...path,
+                        String(index),
+                    ]);
                 }
             });
         } else {
-            Object.values(obj).forEach((child) => {
+            Object.entries(obj).forEach(([key, child]) => {
                 if (!refs.has(child)) {
-                    collectDeepReferences(child, refs);
+                    collectDeepReferences(child, refs, [...path, key]);
                 }
             });
         }

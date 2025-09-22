@@ -33,7 +33,7 @@ function getEx(expression: string, refs: References = {}) {
         currentRefs: [[null, refs]],
         errors: [],
         hoistedRefStacks: {},
-        allGlobalRefs: new Set(),
+        allGlobalRefs: new Map(),
     });
 }
 
