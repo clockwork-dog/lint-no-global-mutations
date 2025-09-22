@@ -321,6 +321,21 @@ export function noMutationRecursive(
                 hoistedRefStacks,
             }));
         },
+
+        NewExpression(path) {
+            if (ignoreIfInsideFunctionBody()) return;
+            const node = path.node;
+            assertIsNodePos(node);
+            const ctor = getPossibleReferences({ ...state, node: node.callee });
+            if (ctor.get().some((fn) => fn === Function)) {
+                state.errors.push(
+                    LintingError.fromNode(
+                        "Do not use Function constructor",
+                        node,
+                    ),
+                );
+            }
+        },
     });
     return returnValue;
 }

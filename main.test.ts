@@ -540,3 +540,18 @@ Deno.test.ignore("Searching through object prototypes", () => {
         -->a(globalArr, { key: 'value' })<--;
         `);
 });
+Deno.test("Doesn't allow eval", () => {
+    testFails(`-->eval(Math.random().toString())<--`);
+});
+Deno.test("Doesn't allow calling Function constructor", () => {
+    testFails(`
+        const f = -->Function(Math.random().toString())<--;
+        f();
+        `);
+});
+Deno.test("Doesn't allow calling Function constructor with new", () => {
+    testFails(`
+        const f = -->new Function(Math.random().toString())<--;
+        f();
+        `);
+});

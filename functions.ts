@@ -1,7 +1,13 @@
 import { types } from "estree-toolkit";
 import { noMutationRecursive, State } from "./main.ts";
 import { Reference } from "./reference.ts";
-import { FunctionNode, isFnNode, NodePos, References } from "./util.ts";
+import {
+    FunctionNode,
+    isFnNode,
+    LintingError,
+    NodePos,
+    References,
+} from "./util.ts";
 import { getPossibleReferences } from "./get_possible_references.ts";
 import { arrayCallbackMethod } from "./array.ts";
 import { objectCallbackMethod } from "./object.ts";
@@ -41,9 +47,26 @@ export function evaluateCallExpression(
 
     possFns.get()
         .forEach((fn) => {
+            if (fn === eval) {
+                state.errors.push(
+                    LintingError.fromNode("Do not use eval", state.node),
+                );
+            }
+            if (fn === Function) {
+                state.errors.push(
+                    LintingError.fromNode(
+                        "Do not use Function constructor",
+                        state.node,
+                    ),
+                );
+            }
+
             // Only evaluate user functions (which are nodes in the AST)
-            if (!isFnNode(fn)) return;
-            returnValue.set(evaluateFnNode({ ...state, node: fn }, args));
+            if (isFnNode(fn)) {
+                returnValue.set(
+                    evaluateFnNode({ ...state, node: fn }, args),
+                );
+            }
         });
 
     // Handle array prototype and object instance methods

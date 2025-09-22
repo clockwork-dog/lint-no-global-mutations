@@ -33,6 +33,10 @@ export function getPossibleReferences(
                     return new Reference([Object]);
                 case "Array":
                     return new Reference([Array]);
+                case "eval":
+                    return new Reference([eval]);
+                case "Function":
+                    return new Reference([Function]);
                 default:
                     return new Reference();
             }
