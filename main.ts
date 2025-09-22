@@ -2,6 +2,7 @@ import { traverse, types } from "estree-toolkit";
 import { constructHoistedScopes } from "./scopes.ts";
 import {
     assertIsNodePos,
+    dedupeErrors,
     functionTypes,
     LintingError,
     References,
@@ -61,7 +62,7 @@ export function noMutation(
         errors,
     );
 
-    return errors;
+    return dedupeErrors(errors);
 }
 
 export function noMutationRecursive(

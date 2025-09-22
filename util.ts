@@ -82,3 +82,22 @@ export class LintingError extends Error {
         return this.constructor.name;
     }
 }
+
+export const dedupeErrors = (allErrors: LintingError[]): LintingError[] => {
+    const errors: LintingError[] = [];
+
+    allErrors.forEach((error) => {
+        for (const e of errors) {
+            // Total overlap
+            if (e.start <= error.start && e.end >= error.end) return;
+            // Start overlaps
+            if (e.start >= error.start && e.start <= error.end) return;
+            // End overlaps
+            if (e.end >= error.start && e.end <= error.end) return;
+        }
+        // Else
+        errors.push(error);
+    });
+
+    return errors;
+};
