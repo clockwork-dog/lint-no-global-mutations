@@ -9,14 +9,13 @@ await build({
     typeCheck: false,
     outDir: "./npm",
     shims: {
-        // see JS docs for overview and more options
         deno: { test: "dev" },
     },
     package: {
         // package.json properties
         name: "lint-no-global-mutations",
         version: Deno.args[0],
-        description: "ESLint No Global Mutations",
+        description: "No Global Mutation Linter",
         license: "MIT",
         repository: {
             type: "git",
