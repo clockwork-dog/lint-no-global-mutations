@@ -498,7 +498,7 @@ Deno.test.ignore("mutation helper tag", () => {
 Deno.test("eval", () => {
     testFails(`-->eval("state.key = 'value';")<--;`);
 });
-Deno.test.ignore("recursive function", () => {
+Deno.test("recursive function", () => {
     testPasses(`
         function multiply(x, y) {
             if (y === 0) return 0;

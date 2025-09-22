@@ -12,9 +12,8 @@ import { getPossibleReferences } from "./get_possible_references.ts";
 import { arrayCallbackMethod } from "./array.ts";
 import { objectCallbackMethod } from "./object.ts";
 
-// TODO:
-// Recursive functions
-// Double check hoisting inside a user function
+// About 1% of available JS callstack size
+const MAX_CALLSTACK_SIZE = 100;
 
 export function evaluateCallExpression(
     state: State & { node: types.CallExpression & NodePos },
@@ -62,7 +61,7 @@ export function evaluateCallExpression(
             }
 
             // Only evaluate user functions (which are nodes in the AST)
-            if (isFnNode(fn)) {
+            if (isFnNode(fn) && state.currentRefs.length < MAX_CALLSTACK_SIZE) {
                 returnValue.set(
                     evaluateFnNode({ ...state, node: fn }, args),
                 );
