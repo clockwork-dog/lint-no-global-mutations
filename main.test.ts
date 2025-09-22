@@ -495,8 +495,8 @@ Deno.test.ignore("mutation helper tag", () => {
             mutate\`\${state}\`;
             `);
 });
-Deno.test.ignore("eval", () => {
-    testFails(`eval("state.key = 'value';");`);
+Deno.test("eval", () => {
+    testFails(`-->eval("state.key = 'value';")<--;`);
 });
 Deno.test.ignore("recursive function", () => {
     testPasses(`
