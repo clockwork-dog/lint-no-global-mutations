@@ -33,9 +33,8 @@ export function assertIsNodePos(node: unknown): asserts node is NodePos {
         throw new Error("");
     }
 }
-const Node = parse("").constructor;
 function isNode(ref: unknown): ref is types.Node {
-    return ref instanceof Node;
+    return typeof ref === "object" && ref !== null && "type" in (ref as Node);
 }
 
 export const isInteger = (n: unknown) => {
