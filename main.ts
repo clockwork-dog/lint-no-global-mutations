@@ -86,26 +86,11 @@ export function noMutationRecursive(
     };
     const returnValue = new Reference();
 
-    // Completely ignore all code inside function bodies as it will be checked when invoked.
-    //.This means when inside a function body, the function node will always be on top of the stack.
-    const ignoreIfInsideFunctionBody = () => {
-        const [topNode, _stack] = currentRefs[0]!;
-        if (
-            functionTypes.has(topNode?.type as any) && // We're in a function body
-            topNode !== code // We're executing said function
-        ) {
-            return true;
-        } else {
-            return false;
-        }
-    };
-
     traverse(code, {
         // We still need to keep track of non-hoisted variables (let / const)
         // So we just initialize each scope with hoisted variables
         BlockStatement: {
             enter(path) {
-                if (ignoreIfInsideFunctionBody()) return;
                 assertIsNodePos(path.node);
                 const newHoistedRefs = hoistedRefStacks[path.node.start]?.[0];
                 // Each scope should appear in the hoisted scopes, and be indexed by the start
@@ -116,30 +101,23 @@ export function noMutationRecursive(
                 currentRefs.unshift(newHoistedRefs);
             },
             leave(_path) {
-                if (ignoreIfInsideFunctionBody()) return;
                 currentRefs.shift();
             },
         },
 
-        // Whenever I get to a function I want to save reference to it so I can use it later.
-        // I want to add it on the stack as a 'marker', then ignore everything until it comes
-        // off the stack.
-
+        // Function bodies are saved as a reference and when invoked will be run
         FunctionExpression: {
             enter(path) {
-                if (ignoreIfInsideFunctionBody()) return;
                 assertIsNodePos(path.node);
-                currentRefs.unshift([path.node, {}]);
-            },
-            leave() {
-                currentRefs.shift();
+                const [rootNode] = currentRefs[0]!;
+                if (path.node !== rootNode) path.skip();
             },
         },
         ArrowFunctionExpression: {
             enter(path) {
-                if (ignoreIfInsideFunctionBody()) return;
                 assertIsNodePos(path.node);
-                currentRefs.unshift([path.node, {}]);
+                const [rootNode] = currentRefs[0]!;
+                if (path.node !== rootNode) path.skip();
 
                 // Arrow function with implied return
                 if (path.node.body.type !== "BlockStatement") {
@@ -150,25 +128,17 @@ export function noMutationRecursive(
                     returnValue.set(val);
                 }
             },
-            leave() {
-                currentRefs.shift();
-            },
         },
         FunctionDeclaration: {
             enter(path) {
-                if (ignoreIfInsideFunctionBody()) return;
                 const node = path.node;
                 assertIsNodePos(node);
-                const [, scope] = currentRefs[0]!;
+                const [rootNode, scope] = currentRefs[0]!;
                 scope[node.id.name] = new Reference([node]);
-                currentRefs.unshift([node, {}]);
-            },
-            leave() {
-                currentRefs.shift();
+                if (path.node !== rootNode) path.skip();
             },
         },
         ReturnStatement(path) {
-            if (ignoreIfInsideFunctionBody()) return;
             const node = path?.node;
             assertIsNodePos(node);
             const val = getPossibleReferences({
@@ -179,7 +149,6 @@ export function noMutationRecursive(
         },
 
         UpdateExpression(path) {
-            if (ignoreIfInsideFunctionBody()) return;
             const node = path?.node;
             assertIsNodePos(node);
             getPossibleReferences({
@@ -200,7 +169,6 @@ export function noMutationRecursive(
         },
 
         UnaryExpression(path) {
-            if (ignoreIfInsideFunctionBody()) return;
             const node = path.node;
             assertIsNodePos(node);
             if (
@@ -226,7 +194,6 @@ export function noMutationRecursive(
         },
 
         AssignmentExpression(path) {
-            if (ignoreIfInsideFunctionBody()) return;
             const node = path.node;
             assertIsNodePos(node);
 
@@ -282,7 +249,6 @@ export function noMutationRecursive(
         },
 
         VariableDeclaration(path) {
-            if (ignoreIfInsideFunctionBody()) return;
             const node = path.node;
             assertIsNodePos(node);
 
@@ -310,7 +276,6 @@ export function noMutationRecursive(
         },
 
         CallExpression(path) {
-            if (ignoreIfInsideFunctionBody()) return;
             const node = path.node;
             assertIsNodePos(node);
             returnValue.set(evaluateCallExpression({
@@ -323,7 +288,6 @@ export function noMutationRecursive(
         },
 
         NewExpression(path) {
-            if (ignoreIfInsideFunctionBody()) return;
             const node = path.node;
             assertIsNodePos(node);
             const ctor = getPossibleReferences({ ...state, node: node.callee });
