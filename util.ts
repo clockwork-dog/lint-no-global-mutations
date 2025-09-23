@@ -1,5 +1,4 @@
 import { types } from "estree-toolkit";
-import { parse } from "espree";
 import { Reference } from "./reference.ts";
 
 export const functionTypes = new Set([

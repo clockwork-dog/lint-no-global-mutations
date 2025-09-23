@@ -130,7 +130,7 @@ export function setPossibleReferences(
     }
 
     possibilities.forEach((poss) => {
-        if (poss instanceof Object) {
+        if (poss instanceof Object && !state.allGlobalRefs.has(poss)) {
             (poss as any)[finalSegment] = new Reference([
                 (poss as any)[finalSegment],
                 value,
