@@ -14,7 +14,7 @@ function testPasses(program: string) {
     assertEquals(program.includes("-->"), false, "Accidental -->");
     assertEquals(program.includes("<--"), false, "Accidental <--");
     const ast = parse(program, { ecmaVersion: 2023 }) as types.Program;
-    const errors = noMutation(ast, globals);
+    const { errors } = noMutation(ast, globals);
     assertEquals(errors.length, 0, errors[0]?.message);
 }
 function testFails(programWithMarkers: string) {
@@ -40,7 +40,7 @@ function testFails(programWithMarkers: string) {
     } catch (e) {
         throw new Error("Cannot parse program:\n" + program + "\n" + e);
     }
-    const errors = noMutation(ast, globals);
+    const { errors } = noMutation(ast, globals);
 
     assertGreaterOrEqual(
         errors.length,

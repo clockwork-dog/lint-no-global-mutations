@@ -1,6 +1,7 @@
 import { traverse, types } from "estree-toolkit";
 import { constructHoistedScopes } from "./scopes.ts";
 import {
+    ANY_STRING,
     assertIsNodePos,
     dedupeErrors,
     LintingError,
@@ -15,23 +16,38 @@ import { setPossibleReferences } from "./set_possible_references.ts";
 import { evaluateCallExpression } from "./functions.ts";
 import { getPossibleBindings, REST_BINDING_ERR } from "./bindings.ts";
 
+export { ANY_STRING };
+export type GetImplementation = (
+    path: Array<string | typeof ANY_STRING>,
+) => Array<{ ast: types.Node; schemaObj: any }>;
+
 export interface State {
     node: types.Node | null | undefined;
     currentRefs: ReferenceStack;
     hoistedRefStacks: Record<string | number, ReferenceStack>;
     allGlobalRefs: Map<unknown, string>;
+    getImplementation?: GetImplementation;
     errors: LintingError[];
+}
+
+export function mutationLinter(
+    program: types.Program,
+    schemaObj: any,
+    getImplementation?: GetImplementation,
+): LintingError[] {
+    return noMutation(program, schemaObj, getImplementation).errors;
 }
 
 export function noMutation(
     program: types.Program,
     schemaObj: any,
-): LintingError[] {
+    getImplementation?: GetImplementation,
+): { returnValue: Reference; errors: LintingError[] } {
     const allGlobalRefs = collectDeepReferences(schemaObj);
     // Construct global scope
     // Get the current scope stack and attach empty reference arrays
     // These will be populated with possible global references later
-    const hoistedRefs = constructHoistedScopes(program);
+    const hoistedRefStacks = constructHoistedScopes(program);
 
     if (typeof schemaObj !== "object" || Array.isArray(schemaObj)) {
         throw new Error(
@@ -43,7 +59,7 @@ export function noMutation(
         globalRefs[key] = new Reference([value]);
     });
 
-    const currentHoistedScope = hoistedRefs["-1"]![0]!;
+    const currentHoistedScope = hoistedRefStacks["-1"]![0]!;
     const currentHoistedRefs: References = {};
     Object.entries(currentHoistedScope).forEach(([key]) => {
         currentHoistedRefs[key] = new Reference();
@@ -54,39 +70,31 @@ export function noMutation(
     ];
 
     const errors: LintingError[] = [];
-    noMutationRecursive(
-        program,
-        currentRefs,
-        hoistedRefs,
-        allGlobalRefs,
-        errors,
-    );
-
-    return dedupeErrors(errors);
-}
-
-export function noMutationRecursive(
-    code:
-        | types.Program
-        | types.FunctionDeclaration
-        | types.FunctionExpression
-        | types.ArrowFunctionExpression,
-    refsStack: ReferenceStack,
-    hoistedRefStacks: Record<number, ReferenceStack>,
-    allGlobalRefs: Map<unknown, string>,
-    errors: LintingError[],
-): Reference {
-    const currentRefs = refsStack;
-    const state: State = {
-        node: code,
+    const returnValue = noMutationRecursive({
+        node: program,
         currentRefs,
         hoistedRefStacks,
         allGlobalRefs,
         errors,
-    };
+    });
+
+    return { returnValue, errors: dedupeErrors(errors) };
+}
+
+export function noMutationRecursive(
+    state: State & {
+        node:
+            | types.Program
+            | types.FunctionDeclaration
+            | types.FunctionExpression
+            | types.ArrowFunctionExpression;
+    },
+): Reference {
+    const { node, hoistedRefStacks, currentRefs, allGlobalRefs, errors } =
+        state;
     const returnValue = new Reference();
 
-    traverse(code, {
+    traverse(node, {
         // We still need to keep track of non-hoisted variables (let / const)
         // So we just initialize each scope with hoisted variables
         BlockStatement: {

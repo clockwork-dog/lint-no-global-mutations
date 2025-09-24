@@ -113,13 +113,7 @@ export function evaluateFnNode(
     state.currentRefs.unshift([fn, argumentStack]);
 
     // Evaluate expression
-    returnValue.set(noMutationRecursive(
-        fn,
-        state.currentRefs,
-        state.hoistedRefStacks,
-        state.allGlobalRefs,
-        state.errors,
-    ));
+    returnValue.set(noMutationRecursive({ ...state, node: fn }));
 
     // Remove from stack
     state.currentRefs.shift();
