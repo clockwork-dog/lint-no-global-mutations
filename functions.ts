@@ -11,6 +11,7 @@ import {
 import { getPossibleReferences } from "./get_possible_references.ts";
 import { arrayCallbackMethod } from "./array.ts";
 import { objectCallbackMethod } from "./object.ts";
+import { getPossibleBindings, REST_BINDING_ERR } from "./bindings.ts";
 
 // About 1% of available JS callstack size
 const MAX_CALLSTACK_SIZE = 100;
@@ -85,13 +86,27 @@ export function evaluateFnNode(
     // Create reference array
     const argumentStack: References = {};
     fn.params.forEach((param, index) => {
-        if (param.type !== "Identifier") {
-            throw new Error("TODO: destructuring");
+        if (param.type === "RestElement") {
+            const restParm = param.argument;
+            if (restParm.type !== "Identifier") {
+                throw new Error(REST_BINDING_ERR);
+            }
+
+            const restArgs = args.slice(index);
+            Object.entries(getPossibleBindings(
+                { ...state, node: restParm },
+                new Reference([restArgs]),
+            )).forEach(([k, v]) => {
+                argumentStack[k] = v;
+            });
+        } else {
+            Object.entries(getPossibleBindings(
+                { ...state, node: param },
+                args[index] ?? new Reference([undefined]),
+            )).forEach(([k, v]) => {
+                argumentStack[k] = v;
+            });
         }
-        if (!args[index]) {
-            throw new Error(`Missing argument at index ${index}`);
-        }
-        argumentStack[param.name] = args[index];
     });
 
     // Add to stack

@@ -3,7 +3,6 @@ import { constructHoistedScopes } from "./scopes.ts";
 import {
     assertIsNodePos,
     dedupeErrors,
-    functionTypes,
     LintingError,
     References,
     ReferenceStack,
@@ -14,6 +13,7 @@ import { Reference } from "./reference.ts";
 import { collectDeepReferences } from "./deep_references.ts";
 import { setPossibleReferences } from "./set_possible_references.ts";
 import { evaluateCallExpression } from "./functions.ts";
+import { getPossibleBindings, REST_BINDING_ERR } from "./bindings.ts";
 
 export interface State {
     node: types.Node | null | undefined;
@@ -255,23 +255,21 @@ export function noMutationRecursive(
             node.declarations.forEach((declaration) => {
                 const { id, init } = declaration;
                 if (!init) return;
-                switch (id.type) {
-                    case "Identifier": {
-                        // Keep track of all the possibilities of the init
-                        const [, scope] = currentRefs[0]!;
-                        scope[id.name] = getPossibleReferences({
-                            ...state,
-                            node: init,
-                        });
-                        break;
-                    }
-                    case "ObjectPattern":
-                    case "RestElement":
-                    case "MemberExpression":
-                    case "ArrayPattern":
-                    case "AssignmentPattern":
-                        throw new Error("TODO: Destructuring");
+
+                if (id.type === "RestElement") {
+                    throw new Error(REST_BINDING_ERR);
                 }
+
+                const val = getPossibleReferences({ ...state, node: init });
+                const bindings = getPossibleBindings(
+                    { ...state, node: id },
+                    val,
+                );
+                const [, scope] = currentRefs[0]!;
+                Object.entries(bindings)
+                    .forEach(([k, v]) => {
+                        scope[k] = v;
+                    });
             });
         },
 

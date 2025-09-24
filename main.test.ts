@@ -69,6 +69,7 @@ Deno.test("user array push", () => {
 });
 Deno.test("assignment to user array", () => {
     testPasses("const a = [...globalArr]");
+    testPasses("const [...a] = globalArr");
 });
 Deno.test("can't update global", () => {
     testFails("-->globalArr++<--");
@@ -87,22 +88,68 @@ Deno.test("can't update global on user array", () => {
         const a = [...globalNestedArr];
         -->a[0]++<--;
         `);
+    testFails(`
+        const [...a] = globalNestedArr;
+        -->a[0]++<--;
+        `);
 });
-Deno.test.ignore("destructuring", () => {
+Deno.test("destructuring", () => {
     testPasses("const { values } = show;");
 });
-Deno.test.ignore("destructuring object and mutating", () => {
-    testFails("const { values } = show; -->values++<--");
+
+Deno.test("destructuring object and mutating", () => {
+    testFails(`
+        const { a } = globalNestedObj;
+        -->a++<--`);
 });
-Deno.test.ignore("destructuring array and mutating", () => {
-    testFails("const [ values ] = [ show ]; -->values++<--");
+Deno.test("destructuring object assignment and mutating", () => {
+    testFails(`
+        const { a: b } = globalNestedObj;
+        -->b++<--`);
 });
-Deno.test.ignore(
+Deno.test("destructuring array assignment and mutating", () => {
+    testFails(`
+        const [a = globalObj] = [];
+        -->a++<--`);
+});
+Deno.test("destructuring deep assignment and mutating", () => {
+    testFails(`
+        const { a: { b: c } } = globalNestedObj;
+        -->c++<--`);
+});
+Deno.test("destructuring mixed assignment and mutating", () => {
+    testFails(`
+        const [{ a: { b: c } }] = [ globalNestedObj ];
+        -->c++<--`);
+});
+Deno.test("destructuring array and mutating", () => {
+    testFails(`
+        const [ arr ] = [ globalArr ];
+        -->arr.pop()<--
+        `);
+});
+Deno.test("destructuring deep array and mutating", () => {
+    testFails(`
+        const [ arr ] = [ [ globalArr ] ];
+        -->arr[0].pop()<--
+        `);
+});
+Deno.test(
     "destructuring array with property access and mutating",
     () => {
-        testFails("const [ values ] = [ scenes['my scene'] ]; -->values++<--");
+        testFails(`
+            const [ b ] = [ globalNestedObj['a'] ];
+            -->b++<--
+            `);
     },
 );
+Deno.test("function spread parameters", () => {
+    testFails(`(
+            function(...rest){
+                -->rest[0].pop()<--;
+            }
+        )(globalArr)`);
+});
 Deno.test("mutate global", () => {
     testFails("-->globalArr++<--;");
 });
@@ -323,7 +370,7 @@ Deno.test("assign and mutate member", () => {
 Deno.test("assign and update member", () => {
     testFails("let a = globalObj; -->a.value = 2<--;");
 });
-Deno.test.ignore("updates spread initialized variables", () => {
+Deno.test("updates spread initialized variables", () => {
     testFails(`
             let { ...spread } = globalNestedObj;
             -->spread.a.b = 'value'<--;
@@ -475,7 +522,7 @@ Deno.test("unknown array element mutation", () => {
             `);
 });
 
-Deno.test.ignore("non-mutating helper function", () => {
+Deno.test("non-mutating helper function", () => {
     testPasses(`
             const logItems = (...items) => console.log('[' + items.join(', ') + ']');
             logItems(state);
