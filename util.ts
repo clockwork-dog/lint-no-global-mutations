@@ -1,16 +1,6 @@
 import { types } from "estree-toolkit";
 import { Reference } from "./reference.ts";
 
-export const functionTypes = new Set([
-    "FunctionDeclaration",
-    "FunctionExpression",
-    "ArrowFunctionExpression",
-]);
-export type FunctionNode =
-    | types.FunctionDeclaration
-    | types.FunctionExpression
-    | types.ArrowFunctionExpression;
-
 export type References = Record<string, Reference>;
 export type ReferenceStack = Array<[types.Node | null, References]>;
 
@@ -28,9 +18,6 @@ export function assertIsNodePos(node: unknown): asserts node is NodePos {
         throw new Error("");
     }
 }
-function isNode(ref: unknown): ref is types.Node {
-    return typeof ref === "object" && ref !== null && "type" in (ref as Node);
-}
 
 export const isInteger = (n: unknown) => {
     switch (typeof n) {
@@ -42,20 +29,6 @@ export const isInteger = (n: unknown) => {
             return n === ANY_STRING;
     }
 };
-
-export function isFnNode(ref: unknown): ref is FunctionNode & NodePos {
-    if (!isNode(ref)) return false;
-    if (!isNodePos(ref)) return false;
-    if (!functionTypes.has(ref.type)) return false;
-    return true;
-}
-export function assertIsFnNode(
-    ref: unknown,
-): asserts ref is
-    & FunctionNode
-    & NodePos {
-    if (!isFnNode(ref)) throw new Error();
-}
 
 export const ANY_STRING = Symbol("any string");
 

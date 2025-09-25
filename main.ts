@@ -13,19 +13,19 @@ import { getPossibleReferences } from "./get_possible_references.ts";
 import { Reference } from "./reference.ts";
 import { collectDeepReferences, pathToString } from "./deep_references.ts";
 import { setPossibleReferences } from "./set_possible_references.ts";
-import { evaluateCallExpression } from "./functions.ts";
+import { evaluateCallExpression, FunctionNode } from "./functions.ts";
 import { getPossibleBindings, REST_BINDING_ERR } from "./bindings.ts";
 
 export { ANY_STRING };
 export type GetImplementation = (
-    path: Array<string | Symbol>,
+    path: Array<string | symbol>,
 ) => Array<{ ast: types.Node; schemaObj: any }>;
 
 export interface State {
     node: types.Node | null | undefined;
     currentRefs: ReferenceStack;
-    hoistedRefStacks: Record<string | number, ReferenceStack>;
-    allGlobalRefs: Map<unknown, Array<string | Symbol>>;
+    hoistedRefStacks: Record<string | number, ReferenceStack[number]>;
+    allGlobalRefs: Map<unknown, Array<string | symbol>>;
     getImplementation?: GetImplementation;
     errors: LintingError[];
 }
@@ -35,38 +35,40 @@ export function mutationLinter(
     schemaObj: any,
     getImplementation?: GetImplementation,
 ): LintingError[] {
-    return noMutation(program, schemaObj, getImplementation).errors;
-}
-
-export function noMutation(
-    program: types.Node,
-    schemaObj: any,
-    getImplementation?: GetImplementation,
-): { returnValue: Reference; errors: LintingError[] } {
-    const allGlobalRefs = collectDeepReferences(schemaObj);
-    // Construct global scope
-    // Get the current scope stack and attach empty reference arrays
-    // These will be populated with possible global references later
-    const hoistedRefStacks = constructHoistedScopes(program);
-
     if (typeof schemaObj !== "object" || Array.isArray(schemaObj)) {
         throw new Error(
             `schemaObj was not an object, got ${JSON.stringify(schemaObj)}`,
         );
     }
+    const allGlobalRefs = collectDeepReferences(schemaObj);
     const globalRefs: References = {};
     Object.entries(schemaObj).forEach(([key, value]) => {
         globalRefs[key] = new Reference([value]);
     });
 
-    const currentHoistedScope = hoistedRefStacks["-1"]![0]!;
-    const currentHoistedRefs: References = {};
-    Object.entries(currentHoistedScope).forEach(([key]) => {
-        currentHoistedRefs[key] = new Reference();
-    });
+    return noMutation(
+        program,
+        globalRefs,
+        allGlobalRefs,
+        getImplementation,
+    ).errors;
+}
+
+export function noMutation(
+    program: types.Node,
+    globalReferences: References,
+    allGlobalRefs: Map<unknown, Array<string | symbol>>,
+    getImplementation?: GetImplementation,
+): { returnValue: Reference; errors: LintingError[] } {
+    // Construct global scope
+    // Get the current scope stack and attach empty reference arrays
+    // These will be populated with possible global references later
+    const hoistedRefStacks = constructHoistedScopes(program);
+    const [_node, initialHoistedRefs] = hoistedRefStacks["-1"]!;
+
     const currentRefs: ReferenceStack = [
-        [program, currentHoistedRefs],
-        [null, globalRefs],
+        [program, initialHoistedRefs],
+        [null, globalReferences],
     ];
 
     const errors: LintingError[] = [];
@@ -76,6 +78,7 @@ export function noMutation(
         hoistedRefStacks,
         allGlobalRefs,
         errors,
+        getImplementation,
     });
 
     return { returnValue, errors: dedupeErrors(errors) };
@@ -94,7 +97,8 @@ export function noMutationRecursive(
         BlockStatement: {
             enter(path) {
                 assertIsNodePos(path.node);
-                const newHoistedRefs = hoistedRefStacks[path.node.start]?.[0];
+                const newHoistedRefs = hoistedRefStacks[path.node.start];
+
                 // Each scope should appear in the hoisted scopes, and be indexed by the start
                 assert(
                     newHoistedRefs,
@@ -136,7 +140,15 @@ export function noMutationRecursive(
                 const node = path.node;
                 assertIsNodePos(node);
                 const [rootNode, scope] = currentRefs[0]!;
-                scope[node.id.name] = new Reference([node]);
+
+                scope[node.id.name] = new Reference([
+                    // TODO: Deep clone state
+                    new FunctionNode({
+                        ...state,
+                        node,
+                    }),
+                ]);
+
                 if (path.node !== rootNode) path.skip();
             },
         },

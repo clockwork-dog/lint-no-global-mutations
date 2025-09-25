@@ -1,6 +1,6 @@
 import { parse } from "espree";
 import { assertEquals, assertGreaterOrEqual } from "@std/assert";
-import { noMutation } from "./main.ts";
+import { mutationLinter } from "./main.ts";
 import { types } from "estree-toolkit";
 
 function testPasses(program: string) {
@@ -14,7 +14,7 @@ function testPasses(program: string) {
     assertEquals(program.includes("-->"), false, "Accidental -->");
     assertEquals(program.includes("<--"), false, "Accidental <--");
     const ast = parse(program, { ecmaVersion: 2023 }) as types.Program;
-    const { errors } = noMutation(ast, globals);
+    const errors = mutationLinter(ast, globals);
     assertEquals(errors.length, 0, errors[0]?.message);
 }
 function testFails(programWithMarkers: string) {
@@ -40,7 +40,7 @@ function testFails(programWithMarkers: string) {
     } catch (e) {
         throw new Error("Cannot parse program:\n" + program + "\n" + e);
     }
-    const { errors } = noMutation(ast, globals);
+    const errors = mutationLinter(ast, globals);
 
     assertGreaterOrEqual(
         errors.length,
@@ -529,9 +529,9 @@ Deno.test("non-mutating helper function", () => {
             `);
 });
 Deno.test("hoisted mutation helper function", () => {
-    testPasses(`
-                mutate(state);
-                function mutate(arr) { arr++; }
+    testFails(`
+                mutate(globalArr);
+                function mutate(arr) { -->arr++<--; }
             `);
 });
 Deno.test.ignore("mutation helper tag", () => {

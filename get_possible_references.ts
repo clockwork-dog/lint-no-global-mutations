@@ -1,7 +1,8 @@
-import { ANY_STRING, assertIsNodePos } from "./util.ts";
+import { ANY_STRING, assertIsNodePos, References } from "./util.ts";
 import { Reference } from "./reference.ts";
-import { evaluateCallExpression } from "./functions.ts";
+import { evaluateCallExpression, FunctionNode } from "./functions.ts";
 import { noMutation, State } from "./main.ts";
+import { collectDeepReferences } from "./deep_references.ts";
 
 export function getAllProperties(object: unknown) {
     let obj = object;
@@ -14,24 +15,67 @@ export function getAllProperties(object: unknown) {
 }
 
 export function getPossibleReferences(state: State): Reference {
-    const refs = getInternalReferences(state);
-    refs.get()
-        .forEach((poss) => {
-            const path = state.allGlobalRefs.get(poss);
-            if (path) {
-                const implementations = state.getImplementation?.(path);
-                implementations?.forEach(({ ast, schemaObj }) => {
-                    const { returnValue, errors } = noMutation(
-                        ast,
-                        schemaObj,
-                        state.getImplementation,
-                    );
-                    state.errors.push(...errors);
-                    refs.set(returnValue);
-                });
+    const getImpl = state.getImplementation;
+    if (!getImpl) return getInternalReferences(state);
+
+    const ex = state.node;
+    if (!ex) return new Reference([ex]);
+
+    switch (ex.type) {
+        case "Identifier":
+            break;
+        case "MemberExpression": {
+            if (ex.object.type === "Super") return new Reference();
+            const obj = getPossibleReferences({
+                ...state,
+                node: ex.object,
+            });
+            let property: string | symbol;
+
+            if (ex.property.type === "Identifier" && !ex.computed) {
+                property = ex.property.name;
+            } else if (ex.property.type === "Literal") {
+                property = String(ex.property.value);
+            } else {
+                property = ANY_STRING;
             }
-        });
-    return refs;
+
+            const returnValues: unknown[] = [];
+
+            obj.get().forEach((ref) => {
+                const global = state.allGlobalRefs.get(ref);
+                if (!global) return;
+                const path = [...global, property];
+                getImpl(path).forEach(
+                    ({ ast, schemaObj }) => {
+                        const allGlobalRefs = collectDeepReferences(schemaObj);
+                        const globalRefs: References = {};
+                        Object.entries(schemaObj).forEach(([key, value]) => {
+                            globalRefs[key] = new Reference([value]);
+                        });
+                        const { errors, returnValue } = noMutation(
+                            ast,
+                            globalRefs,
+                            allGlobalRefs,
+                        );
+
+                        // Is this necessary?
+                        if (typeof returnValue === "object") {
+                            state.allGlobalRefs.set(returnValue, path);
+                        }
+
+                        state.errors.push(...errors);
+                        returnValues.push(returnValue);
+                    },
+                );
+            });
+
+            if (returnValues.length) {
+                return new Reference(returnValues);
+            }
+        }
+    }
+    return getInternalReferences(state);
 }
 
 export function getInternalReferences(
@@ -202,7 +246,8 @@ export function getInternalReferences(
         // For functions we store the node to get access to params and body
         case "FunctionExpression":
         case "ArrowFunctionExpression":
-            return new Reference([ex]);
+            // TODO: Deep clone state
+            return new Reference([new FunctionNode({ ...state, node: ex })]);
         case "CallExpression": {
             assertIsNodePos(ex);
             return evaluateCallExpression({ ...state, node: ex });

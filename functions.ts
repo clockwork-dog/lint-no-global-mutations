@@ -1,13 +1,7 @@
 import { types } from "estree-toolkit";
 import { noMutationRecursive, State } from "./main.ts";
 import { Reference } from "./reference.ts";
-import {
-    FunctionNode,
-    isFnNode,
-    LintingError,
-    NodePos,
-    References,
-} from "./util.ts";
+import { LintingError, NodePos, References, ReferenceStack } from "./util.ts";
 import { getPossibleReferences } from "./get_possible_references.ts";
 import { arrayCallbackMethod } from "./array.ts";
 import { objectCallbackMethod } from "./object.ts";
@@ -15,6 +9,36 @@ import { getPossibleBindings, REST_BINDING_ERR } from "./bindings.ts";
 
 // About 1% of available JS callstack size
 const MAX_CALLSTACK_SIZE = 100;
+
+export const functionTypes = new Set([
+    "FunctionDeclaration",
+    "FunctionExpression",
+    "ArrowFunctionExpression",
+]);
+export type FunctionType =
+    | types.FunctionDeclaration
+    | types.FunctionExpression
+    | types.ArrowFunctionExpression;
+
+export class FunctionNode {
+    constructor(
+        public state: State & { node: FunctionType },
+    ) {}
+
+    static hoisted(
+        node: FunctionType,
+        stack: ReferenceStack,
+        hoisted: Record<number, ReferenceStack[number]>,
+    ) {
+        return new FunctionNode({
+            node,
+            allGlobalRefs: new Map(),
+            currentRefs: stack,
+            hoistedRefStacks: hoisted,
+            errors: [],
+        });
+    }
+}
 
 export function evaluateCallExpression(
     state: State & { node: types.CallExpression & NodePos },
@@ -33,17 +57,9 @@ export function evaluateCallExpression(
 
     // Check all possible functions
     const possFns: Reference = new Reference();
-    switch (node.callee.type) {
-        case "FunctionExpression":
-        case "ArrowFunctionExpression":
-            possFns.set(node.callee);
-            break;
-        default:
-            getPossibleReferences({ ...state, node: node.callee })
-                .get()
-                .forEach((poss) => possFns.set(poss));
-            break;
-    }
+    getPossibleReferences({ ...state, node: node.callee })
+        .get()
+        .forEach((poss) => possFns.set(poss));
 
     possFns.get()
         .forEach((fn) => {
@@ -62,9 +78,23 @@ export function evaluateCallExpression(
             }
 
             // Only evaluate user functions (which are nodes in the AST)
-            if (isFnNode(fn) && state.currentRefs.length < MAX_CALLSTACK_SIZE) {
+            if (
+                fn instanceof FunctionNode &&
+                state.currentRefs.length < MAX_CALLSTACK_SIZE
+            ) {
+                const mergedGloals = new Map([
+                    ...state.allGlobalRefs.entries(),
+                    ...fn.state.allGlobalRefs.entries(),
+                ]);
                 returnValue.set(
-                    evaluateFnNode({ ...state, node: fn }, args),
+                    evaluateFnNode(
+                        {
+                            ...fn.state,
+                            errors: state.errors,
+                            allGlobalRefs: mergedGloals,
+                        },
+                        args,
+                    ),
                 );
             }
         });
@@ -77,7 +107,7 @@ export function evaluateCallExpression(
 }
 
 export function evaluateFnNode(
-    state: State & { node: FunctionNode & NodePos },
+    state: State & { node: FunctionType },
     args: Reference[],
 ) {
     const returnValue = new Reference();

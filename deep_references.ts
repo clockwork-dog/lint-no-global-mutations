@@ -1,17 +1,17 @@
-export const pathToString = (path: Array<string | Symbol>): string => {
+export const pathToString = (path: Array<string | symbol>): string => {
     return path.map((segment) => {
         if (String(segment).match(/^\w+$/)) {
-            return `.${segment}`;
+            return `.${String(segment)}`;
         } else {
-            return `["${segment}"]`;
+            return `["${String(segment)}"]`;
         }
     }).join("").replace(/^\./, "");
 };
 
 export function collectDeepReferences(
     obj: unknown,
-    refs = new Map<unknown, Array<string | Symbol>>(),
-    path: Array<string | Symbol> = [],
+    refs = new Map<unknown, Array<string | symbol>>(),
+    path: Array<string | symbol> = [],
 ) {
     if (typeof obj === "object" && obj !== null) {
         refs.set(obj, path);

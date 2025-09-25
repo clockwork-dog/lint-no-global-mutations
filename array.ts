@@ -2,14 +2,8 @@ import { types } from "estree-toolkit";
 import { State } from "./main.ts";
 import { Reference } from "./reference.ts";
 import { getPossibleReferences } from "./get_possible_references.ts";
-import {
-    ANY_STRING,
-    assertIsFnNode,
-    isFnNode,
-    LintingError,
-    NodePos,
-} from "./util.ts";
-import { evaluateFnNode } from "./functions.ts";
+import { ANY_STRING, LintingError, NodePos } from "./util.ts";
+import { evaluateFnNode, FunctionNode } from "./functions.ts";
 import { pathToString } from "./deep_references.ts";
 
 type MemberCallExpression = types.Node & {
@@ -32,13 +26,15 @@ const elemIndexArrCallback = (
         ...state,
         node: state.node.arguments[0]!,
     });
-    callbacks.get().filter(isFnNode).forEach((callback) => {
-        evaluateFnNode({ ...state, node: callback }, [
-            element,
-            index,
-            array,
-        ]);
-    });
+    callbacks.get()
+        .filter((callback) => callback instanceof FunctionNode)
+        .forEach((callback) => {
+            evaluateFnNode(callback.state, [
+                element,
+                index,
+                array,
+            ]);
+        });
 
     return [element, index, array];
 };
@@ -114,13 +110,15 @@ const ARRAY_INSTANCE_METHODS = new Map<Function, CallbackHandler>([
             ...state,
             node: state.node.arguments[0]!,
         });
-        callbacks.get().filter(isFnNode).forEach((callback) => {
-            returnValues.push(evaluateFnNode({ ...state, node: callback }, [
-                element,
-                index,
-                array,
-            ]));
-        });
+        callbacks.get()
+            .filter((callback) => callback instanceof FunctionNode)
+            .forEach((callback) => {
+                returnValues.push(evaluateFnNode(callback.state, [
+                    element,
+                    index,
+                    array,
+                ]));
+            });
 
         return new Reference(returnValues);
     }],
@@ -140,13 +138,15 @@ const ARRAY_INSTANCE_METHODS = new Map<Function, CallbackHandler>([
             ...state,
             node: state.node.arguments[0]!,
         });
-        callbacks.get().filter(isFnNode).forEach((callback) => {
-            returnValues.push(evaluateFnNode({ ...state, node: callback }, [
-                element,
-                index,
-                array,
-            ]));
-        });
+        callbacks.get()
+            .filter((callback) => callback instanceof FunctionNode)
+            .forEach((callback) => {
+                returnValues.push(evaluateFnNode(callback.state, [
+                    element,
+                    index,
+                    array,
+                ]));
+            });
 
         return new Reference([returnValues]);
     }],
@@ -183,17 +183,20 @@ const ARRAY_INSTANCE_METHODS = new Map<Function, CallbackHandler>([
             ...element.get(),
             ...initialValue.get(),
         ]);
-        callbacks.get().filter(isFnNode).forEach((callback) => {
-            returnValue.set(evaluateFnNode({ ...state, node: callback }, [
-                accumulator,
-                accumulator,
-                index,
-                array,
-            ]));
-        });
+        callbacks.get()
+            .filter((callback) => callback instanceof FunctionNode)
+            .forEach((callback) => {
+                returnValue.set(evaluateFnNode(callback.state, [
+                    accumulator,
+                    accumulator,
+                    index,
+                    array,
+                ]));
+            });
         return returnValue;
     }],
     [[].reduceRight, (state) => {
+        const returnValue = new Reference();
         const array = getPossibleReferences({
             ...state,
             node: state.node.callee.object,
@@ -203,19 +206,26 @@ const ARRAY_INSTANCE_METHODS = new Map<Function, CallbackHandler>([
         const initialValue = state.node.arguments.length > 1
             ? getPossibleReferences({ ...state, node: state.node.arguments[1] })
             : element;
+        const callbacks = getPossibleReferences({
+            ...state,
+            node: state.node.arguments[0]!,
+        });
         const accumulator = new Reference([
             ...element.get(),
             ...initialValue.get(),
         ]);
-        const callback = state.node.arguments[0]!;
-        assertIsFnNode(callback);
 
-        return evaluateFnNode({ ...state, node: callback }, [
-            accumulator,
-            accumulator,
-            index,
-            array,
-        ]);
+        callbacks.get()
+            .filter((callback) => callback instanceof FunctionNode)
+            .forEach((callback) => {
+                returnValue.set(evaluateFnNode(callback.state, [
+                    accumulator,
+                    accumulator,
+                    index,
+                    array,
+                ]));
+            });
+        return returnValue;
     }],
     [[].reverse, (state) => {
         return mutatingMethod(state);
