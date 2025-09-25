@@ -68,3 +68,13 @@ export const dedupeErrors = (allErrors: LintingError[]): LintingError[] => {
 
     return errors;
 };
+
+export const pathToString = (path: Array<string | symbol>): string => {
+    return path.map((segment) => {
+        if (String(segment).match(/^\w+$/)) {
+            return `.${String(segment)}`;
+        } else {
+            return `["${String(segment)}"]`;
+        }
+    }).join("").replace(/^\./, "");
+};

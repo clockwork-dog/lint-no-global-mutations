@@ -3,7 +3,7 @@ import { State } from "./main.ts";
 import { Reference } from "./reference.ts";
 import { getPossibleReferences } from "./get_possible_references.ts";
 import { ANY_STRING, LintingError, NodePos } from "./util.ts";
-import { pathToString } from "./deep_references.ts";
+import { pathToString } from "./util.ts";
 
 const getTarget = (
     state: State & { node: types.CallExpression & NodePos },

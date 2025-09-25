@@ -4,7 +4,7 @@ import { Reference } from "./reference.ts";
 import { getPossibleReferences } from "./get_possible_references.ts";
 import { ANY_STRING, LintingError, NodePos } from "./util.ts";
 import { evaluateFnNode, FunctionNode } from "./functions.ts";
-import { pathToString } from "./deep_references.ts";
+import { pathToString } from "./util.ts";
 
 type MemberCallExpression = types.Node & {
     type: "CallExpression";

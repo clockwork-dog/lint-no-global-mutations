@@ -11,7 +11,7 @@ import {
 import { assert } from "@std/assert";
 import { getPossibleReferences } from "./get_possible_references.ts";
 import { Reference } from "./reference.ts";
-import { pathToString } from "./deep_references.ts";
+import { pathToString } from "./util.ts";
 import { setPossibleReferences } from "./set_possible_references.ts";
 import { evaluateCallExpression, FunctionNode } from "./functions.ts";
 import { getPossibleBindings, REST_BINDING_ERR } from "./bindings.ts";
