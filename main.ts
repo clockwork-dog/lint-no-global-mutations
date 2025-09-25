@@ -152,6 +152,7 @@ export function noMutationRecursive(
                 if (path.node !== rootNode) path.skip();
             },
         },
+
         ReturnStatement(path) {
             const node = path?.node;
             assertIsNodePos(node);
@@ -160,6 +161,22 @@ export function noMutationRecursive(
                 node: node.argument,
             });
             returnValue.set(val);
+        },
+
+        Program(path) {
+            const node = path?.node;
+            assertIsNodePos(node);
+            if (node.body.length === 1) {
+                const body = node.body[0];
+                if (body?.type === "ExpressionStatement") {
+                    returnValue.set(
+                        getPossibleReferences({
+                            ...state,
+                            node: body.expression,
+                        }),
+                    );
+                }
+            }
         },
 
         UpdateExpression(path) {
