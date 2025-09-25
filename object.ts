@@ -3,6 +3,7 @@ import { State } from "./main.ts";
 import { Reference } from "./reference.ts";
 import { getPossibleReferences } from "./get_possible_references.ts";
 import { ANY_STRING, LintingError, NodePos } from "./util.ts";
+import { pathToString } from "./deep_references.ts";
 
 const getTarget = (
     state: State & { node: types.CallExpression & NodePos },
@@ -29,11 +30,13 @@ const mutatesTarget = (
 ) => {
     target.get()
         .map((ref) => state.allGlobalRefs.get(ref))
-        .filter(Boolean)
+        .filter((ref) => ref != undefined)
         .forEach((path) => {
             state.errors.push(
                 LintingError.fromNode(
-                    `Cannot call mutating Object prototype method on ${path}`,
+                    `Cannot call mutating Object prototype method on ${
+                        pathToString(path)
+                    }`,
                     state.node,
                 ),
             );

@@ -3,7 +3,7 @@ import { assertIsNodePos, ReferenceStack } from "./util.ts";
 import { Reference } from "./reference.ts";
 
 export function constructHoistedScopes(
-    program: types.Program,
+    program: types.Node,
 ): Record<string | number, ReferenceStack> {
     let currentScopeStack: ReferenceStack = [[program, {}]];
     // At the start of each block statement, this will be the current stack

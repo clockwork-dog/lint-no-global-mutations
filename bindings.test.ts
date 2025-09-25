@@ -1,9 +1,8 @@
 import { getPossibleBindings } from "./bindings.ts";
 import { getPossibleReferences } from "./get_possible_references.ts";
 import { State } from "./main.ts";
-import { Reference } from "./reference.ts";
 import { parseDeclaration } from "./test_utils.ts";
-import { assertArrayIncludes, assertEquals } from "@std/assert";
+import { assertEquals } from "@std/assert";
 import { ANY_STRING } from "./util.ts";
 
 const MOCK_STATE: State = {

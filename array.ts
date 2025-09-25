@@ -10,6 +10,7 @@ import {
     NodePos,
 } from "./util.ts";
 import { evaluateFnNode } from "./functions.ts";
+import { pathToString } from "./deep_references.ts";
 
 type MemberCallExpression = types.Node & {
     type: "CallExpression";
@@ -50,11 +51,13 @@ const mutatingMethod = (
     });
     array.get()
         .map((arr) => state.allGlobalRefs.get(arr))
-        .filter(Boolean)
+        .filter((arr) => arr != undefined)
         .forEach((path) => {
             state.errors.push(
                 LintingError.fromNode(
-                    `Can't call mutating array instance method on ${path}`,
+                    `Can't call mutating array instance method on ${
+                        pathToString(path)
+                    }`,
                     state.node,
                 ),
             );

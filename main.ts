@@ -11,21 +11,21 @@ import {
 import { assert } from "@std/assert";
 import { getPossibleReferences } from "./get_possible_references.ts";
 import { Reference } from "./reference.ts";
-import { collectDeepReferences } from "./deep_references.ts";
+import { collectDeepReferences, pathToString } from "./deep_references.ts";
 import { setPossibleReferences } from "./set_possible_references.ts";
 import { evaluateCallExpression } from "./functions.ts";
 import { getPossibleBindings, REST_BINDING_ERR } from "./bindings.ts";
 
 export { ANY_STRING };
 export type GetImplementation = (
-    path: Array<string | typeof ANY_STRING>,
+    path: Array<string | Symbol>,
 ) => Array<{ ast: types.Node; schemaObj: any }>;
 
 export interface State {
     node: types.Node | null | undefined;
     currentRefs: ReferenceStack;
     hoistedRefStacks: Record<string | number, ReferenceStack>;
-    allGlobalRefs: Map<unknown, string>;
+    allGlobalRefs: Map<unknown, Array<string | Symbol>>;
     getImplementation?: GetImplementation;
     errors: LintingError[];
 }
@@ -39,7 +39,7 @@ export function mutationLinter(
 }
 
 export function noMutation(
-    program: types.Program,
+    program: types.Node,
     schemaObj: any,
     getImplementation?: GetImplementation,
 ): { returnValue: Reference; errors: LintingError[] } {
@@ -82,13 +82,7 @@ export function noMutation(
 }
 
 export function noMutationRecursive(
-    state: State & {
-        node:
-            | types.Program
-            | types.FunctionDeclaration
-            | types.FunctionExpression
-            | types.ArrowFunctionExpression;
-    },
+    state: State,
 ): Reference {
     const { node, hoistedRefStacks, currentRefs, allGlobalRefs, errors } =
         state;
@@ -165,11 +159,13 @@ export function noMutationRecursive(
             })
                 .get()
                 .map((ref) => allGlobalRefs.get(ref))
-                .filter(Boolean)
+                .filter((ref) => ref != undefined)
                 .forEach((path) => {
                     errors.push(
                         LintingError.fromNode(
-                            `Cannot mutate global variable ${path}`,
+                            `Cannot mutate global variable ${
+                                pathToString(path)
+                            }`,
                             node,
                         ),
                     );
@@ -189,11 +185,13 @@ export function noMutationRecursive(
                 })
                     .get()
                     .map((ref) => allGlobalRefs.get(ref))
-                    .filter(Boolean)
+                    .filter((ref) => ref != undefined)
                     .forEach((path) => {
                         errors.push(
                             LintingError.fromNode(
-                                `Cannot mutate global variable ${path}`,
+                                `Cannot mutate global variable ${
+                                    pathToString(path)
+                                }`,
                                 node,
                             ),
                         );
@@ -228,11 +226,13 @@ export function noMutationRecursive(
 
             possibleMutations
                 .map((ref) => allGlobalRefs.get(ref))
-                .filter(Boolean)
+                .filter((ref) => ref != undefined)
                 .forEach((path) => {
                     errors.push(
                         LintingError.fromNode(
-                            `Cannot mutate global variable ${path}`,
+                            `Cannot mutate global variable ${
+                                pathToString(path)
+                            }`,
                             node,
                         ),
                     );

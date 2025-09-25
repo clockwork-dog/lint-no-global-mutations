@@ -1,7 +1,7 @@
 import { ANY_STRING, assertIsNodePos } from "./util.ts";
 import { Reference } from "./reference.ts";
 import { evaluateCallExpression } from "./functions.ts";
-import { State } from "./main.ts";
+import { noMutation, State } from "./main.ts";
 
 export function getAllProperties(object: unknown) {
     let obj = object;
@@ -13,7 +13,28 @@ export function getAllProperties(object: unknown) {
     return properties;
 }
 
-export function getPossibleReferences(
+export function getPossibleReferences(state: State): Reference {
+    const refs = getInternalReferences(state);
+    refs.get()
+        .forEach((poss) => {
+            const path = state.allGlobalRefs.get(poss);
+            if (path) {
+                const implementations = state.getImplementation?.(path);
+                implementations?.forEach(({ ast, schemaObj }) => {
+                    const { returnValue, errors } = noMutation(
+                        ast,
+                        schemaObj,
+                        state.getImplementation,
+                    );
+                    state.errors.push(...errors);
+                    refs.set(returnValue);
+                });
+            }
+        });
+    return refs;
+}
+
+export function getInternalReferences(
     state: State,
 ): Reference {
     const ex = state.node;
@@ -46,28 +67,28 @@ export function getPossibleReferences(
         case "LogicalExpression":
             // ||, &&, ??
             return new Reference([
-                ...getPossibleReferences({ ...state, node: ex.left }).get(),
-                ...getPossibleReferences({ ...state, node: ex.right }).get(),
+                ...getInternalReferences({ ...state, node: ex.left }).get(),
+                ...getInternalReferences({ ...state, node: ex.right }).get(),
             ]);
         case "ConditionalExpression":
             // condition ? a : b
             return new Reference([
-                ...getPossibleReferences({ ...state, node: ex.consequent })
+                ...getInternalReferences({ ...state, node: ex.consequent })
                     .get(),
-                ...getPossibleReferences({ ...state, node: ex.alternate })
+                ...getInternalReferences({ ...state, node: ex.alternate })
                     .get(),
             ]);
         case "AssignmentExpression":
             // a = b = {}
             // (a and b are the same reference)
-            return getPossibleReferences({ ...state, node: ex.right });
+            return getInternalReferences({ ...state, node: ex.right });
         case "UnaryExpression":
             // Operators + - ! ~ typeof void delete
             // These all return primitives
-            return new Reference();
+            return new Reference([ANY_STRING]);
         case "UpdateExpression":
             // ++ -- return primitives
-            return new Reference();
+            return new Reference([ANY_STRING]);
         case "ArrayExpression": {
             // TODO: Check this!
             const elements: unknown[] = [];
@@ -75,7 +96,7 @@ export function getPossibleReferences(
                 .filter((elem) => elem !== null)
                 .forEach((elem) => {
                     if (elem?.type === "SpreadElement") {
-                        getPossibleReferences({ ...state, node: elem.argument })
+                        getInternalReferences({ ...state, node: elem.argument })
                             .get()
                             .filter(Array.isArray)
                             .forEach((arr) => {
@@ -84,7 +105,7 @@ export function getPossibleReferences(
                                 });
                             });
                     } else {
-                        getPossibleReferences({ ...state, node: elem })
+                        getInternalReferences({ ...state, node: elem })
                             .get()
                             .forEach((p) => elements.push(p));
                     }
@@ -105,14 +126,14 @@ export function getPossibleReferences(
 
                     switch (key.type) {
                         case "Identifier":
-                            object[key.name] = getPossibleReferences({
+                            object[key.name] = getInternalReferences({
                                 ...state,
                                 node: value,
                             });
                             break;
                         case "Literal":
                             if (key.raw === undefined) return;
-                            object[key.raw] = getPossibleReferences({
+                            object[key.raw] = getInternalReferences({
                                 ...state,
                                 node: value,
                             });
@@ -143,7 +164,7 @@ export function getPossibleReferences(
                         case "UnaryExpression":
                         case "UpdateExpression":
                         case "YieldExpression":
-                            object[ANY_STRING] = getPossibleReferences({
+                            object[ANY_STRING] = getInternalReferences({
                                 ...state,
                                 node: value,
                             });
@@ -164,17 +185,17 @@ export function getPossibleReferences(
                 property = ANY_STRING;
             }
 
-            return getPossibleReferences({ ...state, node: ex.object }).getKey(
+            return getInternalReferences({ ...state, node: ex.object }).getKey(
                 property,
             );
         }
         case "ChainExpression":
             // Optional chaining
-            return getPossibleReferences({ ...state, node: ex.expression });
+            return getInternalReferences({ ...state, node: ex.expression });
         case "SequenceExpression":
             // const a = (b = 1, c = 2, d = 3)
             // Returns the last expression
-            return getPossibleReferences(
+            return getInternalReferences(
                 { ...state, node: ex.expressions[ex.expressions.length - 1]! },
             );
 

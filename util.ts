@@ -10,13 +10,9 @@ export type FunctionNode =
     | types.FunctionDeclaration
     | types.FunctionExpression
     | types.ArrowFunctionExpression;
-export type ScopeNode =
-    | types.BlockStatement
-    | types.Program
-    | FunctionNode
-    | null;
+
 export type References = Record<string, Reference>;
-export type ReferenceStack = Array<[ScopeNode, References]>;
+export type ReferenceStack = Array<[types.Node | null, References]>;
 
 export type NodePos = {
     start: number;

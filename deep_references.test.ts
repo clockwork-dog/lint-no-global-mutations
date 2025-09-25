@@ -37,5 +37,9 @@ Deno.test("Creates path", () => {
         },
     };
     const refs = collectDeepReferences(global);
-    assertEquals(refs.get(global.outer.middle.inner), "outer.middle.inner");
+    assertEquals(refs.get(global.outer.middle.inner), [
+        "outer",
+        "middle",
+        "inner",
+    ]);
 });

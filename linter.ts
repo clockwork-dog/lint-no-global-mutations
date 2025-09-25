@@ -13,7 +13,7 @@ export class NoGlobalMutations {
                 const ast = parse(source, {
                     ecmaVersion: 2023,
                 }) as types.Program;
-                lint = noMutation(ast, this._schema).map((e) => ({
+                lint = noMutation(ast, this._schema).errors.map((e) => ({
                     from: e.start!,
                     to: e.end!,
                     message: e.message,
