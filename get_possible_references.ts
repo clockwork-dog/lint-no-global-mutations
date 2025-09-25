@@ -2,7 +2,7 @@ import { ANY_STRING, assertIsNodePos, References } from "./util.ts";
 import { Reference } from "./reference.ts";
 import { evaluateCallExpression, FunctionNode } from "./functions.ts";
 import { noMutation, State } from "./main.ts";
-import { collectDeepReferences } from "./deep_references.ts";
+import { globalAccessTracker } from "./global_access_tracker.ts";
 
 export function getAllProperties(object: unknown) {
     let obj = object;
@@ -48,15 +48,20 @@ export function getPossibleReferences(state: State): Reference {
                 const path = [...global, property];
                 getImpl(path).forEach(
                     ({ ast, schemaObj }) => {
-                        const allGlobalRefs = collectDeepReferences(schemaObj);
+                        const trackedGlobals = globalAccessTracker(
+                            schemaObj,
+                            state.allGlobalRefs,
+                        );
                         const globalRefs: References = {};
-                        Object.entries(schemaObj).forEach(([key, value]) => {
-                            globalRefs[key] = new Reference([value]);
-                        });
+                        Object.entries(trackedGlobals).forEach(
+                            ([key, value]) => {
+                                globalRefs[key] = new Reference([value]);
+                            },
+                        );
                         const { errors, returnValue } = noMutation(
                             ast,
                             globalRefs,
-                            allGlobalRefs,
+                            state.allGlobalRefs,
                         );
 
                         // Is this necessary?
@@ -111,21 +116,21 @@ export function getInternalReferences(
         case "LogicalExpression":
             // ||, &&, ??
             return new Reference([
-                ...getInternalReferences({ ...state, node: ex.left }).get(),
-                ...getInternalReferences({ ...state, node: ex.right }).get(),
+                ...getPossibleReferences({ ...state, node: ex.left }).get(),
+                ...getPossibleReferences({ ...state, node: ex.right }).get(),
             ]);
         case "ConditionalExpression":
             // condition ? a : b
             return new Reference([
-                ...getInternalReferences({ ...state, node: ex.consequent })
+                ...getPossibleReferences({ ...state, node: ex.consequent })
                     .get(),
-                ...getInternalReferences({ ...state, node: ex.alternate })
+                ...getPossibleReferences({ ...state, node: ex.alternate })
                     .get(),
             ]);
         case "AssignmentExpression":
             // a = b = {}
             // (a and b are the same reference)
-            return getInternalReferences({ ...state, node: ex.right });
+            return getPossibleReferences({ ...state, node: ex.right });
         case "UnaryExpression":
             // Operators + - ! ~ typeof void delete
             // These all return primitives
@@ -140,7 +145,7 @@ export function getInternalReferences(
                 .filter((elem) => elem !== null)
                 .forEach((elem) => {
                     if (elem?.type === "SpreadElement") {
-                        getInternalReferences({ ...state, node: elem.argument })
+                        getPossibleReferences({ ...state, node: elem.argument })
                             .get()
                             .filter(Array.isArray)
                             .forEach((arr) => {
@@ -149,7 +154,7 @@ export function getInternalReferences(
                                 });
                             });
                     } else {
-                        getInternalReferences({ ...state, node: elem })
+                        getPossibleReferences({ ...state, node: elem })
                             .get()
                             .forEach((p) => elements.push(p));
                     }
@@ -170,14 +175,14 @@ export function getInternalReferences(
 
                     switch (key.type) {
                         case "Identifier":
-                            object[key.name] = getInternalReferences({
+                            object[key.name] = getPossibleReferences({
                                 ...state,
                                 node: value,
                             });
                             break;
                         case "Literal":
                             if (key.raw === undefined) return;
-                            object[key.raw] = getInternalReferences({
+                            object[key.raw] = getPossibleReferences({
                                 ...state,
                                 node: value,
                             });
@@ -208,7 +213,7 @@ export function getInternalReferences(
                         case "UnaryExpression":
                         case "UpdateExpression":
                         case "YieldExpression":
-                            object[ANY_STRING] = getInternalReferences({
+                            object[ANY_STRING] = getPossibleReferences({
                                 ...state,
                                 node: value,
                             });
@@ -229,17 +234,17 @@ export function getInternalReferences(
                 property = ANY_STRING;
             }
 
-            return getInternalReferences({ ...state, node: ex.object }).getKey(
+            return getPossibleReferences({ ...state, node: ex.object }).getKey(
                 property,
             );
         }
         case "ChainExpression":
             // Optional chaining
-            return getInternalReferences({ ...state, node: ex.expression });
+            return getPossibleReferences({ ...state, node: ex.expression });
         case "SequenceExpression":
             // const a = (b = 1, c = 2, d = 3)
             // Returns the last expression
-            return getInternalReferences(
+            return getPossibleReferences(
                 { ...state, node: ex.expressions[ex.expressions.length - 1]! },
             );
 

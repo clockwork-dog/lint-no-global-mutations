@@ -10,7 +10,7 @@ export class Reference {
 
     private _possibilities: Set<unknown> = new Set();
 
-    get() {
+    public get() {
         return Reference.unwrap(this);
     }
 
@@ -40,7 +40,7 @@ export class Reference {
         return new Reference(possibilities);
     }
 
-    set(value: unknown) {
+    public set(value: unknown) {
         const possibilities = this.get();
         this._possibilities = new Set([...possibilities, value]);
     }

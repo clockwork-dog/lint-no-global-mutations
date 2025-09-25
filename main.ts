@@ -11,10 +11,11 @@ import {
 import { assert } from "@std/assert";
 import { getPossibleReferences } from "./get_possible_references.ts";
 import { Reference } from "./reference.ts";
-import { collectDeepReferences, pathToString } from "./deep_references.ts";
+import { pathToString } from "./deep_references.ts";
 import { setPossibleReferences } from "./set_possible_references.ts";
 import { evaluateCallExpression, FunctionNode } from "./functions.ts";
 import { getPossibleBindings, REST_BINDING_ERR } from "./bindings.ts";
+import { globalAccessTracker } from "./global_access_tracker.ts";
 
 export { ANY_STRING };
 export type GetImplementation = (
@@ -40,9 +41,10 @@ export function mutationLinter(
             `schemaObj was not an object, got ${JSON.stringify(schemaObj)}`,
         );
     }
-    const allGlobalRefs = collectDeepReferences(schemaObj);
+    const allGlobalRefs: Map<unknown, Array<string | symbol>> = new Map();
+    const trackedGlobals = globalAccessTracker(schemaObj, allGlobalRefs);
     const globalRefs: References = {};
-    Object.entries(schemaObj).forEach(([key, value]) => {
+    Object.entries(trackedGlobals).forEach(([key, value]) => {
         globalRefs[key] = new Reference([value]);
     });
 
@@ -182,6 +184,7 @@ export function noMutationRecursive(
         UpdateExpression(path) {
             const node = path?.node;
             assertIsNodePos(node);
+
             getPossibleReferences({
                 ...state,
                 node: node.argument,

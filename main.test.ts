@@ -74,6 +74,9 @@ Deno.test("assignment to user array", () => {
 Deno.test("can't update global", () => {
     testFails("-->globalArr++<--");
 });
+Deno.test("can't update global property", () => {
+    testFails("-->globalNestedObj.a++<--");
+});
 Deno.test("can't delete global property", () => {
     testFails("-->delete globalNestedObj.a<--");
 });
