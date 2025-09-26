@@ -16,7 +16,9 @@ import { evaluateCallExpression, FunctionNode } from "./functions.ts";
 import { getPossibleBindings, REST_BINDING_ERR } from "./bindings.ts";
 import { globalAccessTracker } from "./global_access_tracker.ts";
 
-export { ANY_STRING };
+export { ANY_STRING } from "./util.ts";
+export { NoGlobalMutations } from "./linter.ts";
+
 export type GetImplementation = (
     path: Array<string | symbol>,
 ) => Array<{ ast: types.Node; schemaObj: any }>;

@@ -1,6 +1,6 @@
 import { Diagnostic, linter as createLinter } from "@codemirror/lint";
 import { parse } from "espree";
-import { noMutation } from "./main.ts";
+import { mutationLinter } from "./main.ts";
 import { types } from "estree-toolkit";
 
 export class NoGlobalMutations {
@@ -13,7 +13,7 @@ export class NoGlobalMutations {
                 const ast = parse(source, {
                     ecmaVersion: 2023,
                 }) as types.Program;
-                lint = noMutation(ast, this._schema).errors.map((e) => ({
+                lint = mutationLinter(ast, this._schema).map((e) => ({
                     from: e.start!,
                     to: e.end!,
                     message: e.message,

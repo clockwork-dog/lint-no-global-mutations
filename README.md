@@ -12,7 +12,7 @@ import { basicSetup, EditorView } from "codemirror";
 import { javascript } from "@codemirror/lang-javascript";
 import { NoGlobalMutations } from "lint-no-global-mutations";
 
-const schema = { window: { key: "value" } };
+const schema = { window: { isDev: false } };
 const noMutation = new NoGlobalMutations(schema);
 
 const editor = new EditorView({
