@@ -391,6 +391,13 @@ Deno.test("updates indirected global property", () => {
             -->o.a.key = 'value'<--;
             `);
 });
+Deno.test("updates path with function call", () => {
+    testFails(`
+            function getObj() { return globalObj; }
+            const o = { g: getObj }
+            -->o.g().a = 2<--;
+            `);
+});
 Deno.test("method inspects global property", () => {
     testPasses(`Object.keys(state.values);`);
 });

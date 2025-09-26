@@ -12,7 +12,6 @@ import { assert } from "@std/assert";
 import { getPossibleReferences } from "./get_possible_references.ts";
 import { Reference } from "./reference.ts";
 import { pathToString } from "./util.ts";
-import { setPossibleReferences } from "./set_possible_references.ts";
 import { evaluateCallExpression, FunctionNode } from "./functions.ts";
 import { getPossibleBindings, REST_BINDING_ERR } from "./bindings.ts";
 import { globalAccessTracker } from "./global_access_tracker.ts";
@@ -280,9 +279,44 @@ export function noMutationRecursive(
                         }
                     }
                     break;
-                case "MemberExpression":
-                    setPossibleReferences(node.left, node.right, state);
+                case "MemberExpression": {
+                    const object = getPossibleReferences({
+                        ...state,
+                        node: node.left.object,
+                    });
+                    const objectPaths = object.get()
+                        .map((ref) => allGlobalRefs.get(ref))
+                        .filter((ref) => ref != undefined);
+                    if (objectPaths.length) {
+                        errors.push(
+                            ...objectPaths.map((path) =>
+                                LintingError.fromNode(
+                                    `Cannot mutate global variable ${
+                                        pathToString(path)
+                                    }`,
+                                    node,
+                                )
+                            ),
+                        );
+                        return;
+                    }
+
+                    let property: string | symbol;
+                    if (
+                        node.left.property.type === "Identifier" &&
+                        !node.left.computed
+                    ) {
+                        property = node.left.property.name;
+                    } else if (node.left.property.type === "Literal") {
+                        property = String(node.left.property.value);
+                    } else {
+                        property = ANY_STRING;
+                    }
+
+                    object.setKey(property, value);
+
                     break;
+                }
                 default:
                     throw new Error("TODO!");
             }
