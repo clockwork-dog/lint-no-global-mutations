@@ -1,3 +1,4 @@
+const objectCache = new WeakMap<object, object>();
 const unfrozenObjectCache = new WeakMap();
 
 export function globalAccessTracker<T extends object>(
@@ -17,6 +18,10 @@ export function globalAccessTracker<T extends object>(
         }
     }
 
+    if (objectCache.has(schemaObj)) {
+        return objectCache.get(schemaObj) as T;
+    }
+
     const proxy = new Proxy(schemaObj, {
         get(target, property, receiver) {
             const value = Reflect.get(target, property, receiver);
@@ -34,6 +39,8 @@ export function globalAccessTracker<T extends object>(
 
     map.set(schemaObj, path);
     map.set(proxy, path);
+    objectCache.set(schemaObj, proxy);
+    objectCache.set(proxy, proxy);
 
     return proxy;
 }
