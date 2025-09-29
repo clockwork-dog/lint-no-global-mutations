@@ -104,6 +104,7 @@ export function noMutationRecursive(
         allGlobalRefs,
         errors,
         maxDepth,
+        getImplementation,
     } = state;
     const returnValue = new Reference();
     if (maxDepth <= 0) return returnValue;
@@ -373,6 +374,7 @@ export function noMutationRecursive(
                 errors,
                 maxDepth,
                 hoistedRefStacks,
+                getImplementation,
             }));
         },
 
