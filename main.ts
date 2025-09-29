@@ -30,11 +30,15 @@ export interface State {
     allGlobalRefs: Map<unknown, Array<string | symbol>>;
     getImplementation?: GetImplementation;
     errors: LintingError[];
+    maxDepth: number;
 }
+
+const MAX_STACK_SIZE = 100;
 
 export function mutationLinter(
     program: types.Program,
     schemaObj: any,
+    maximumDepth = MAX_STACK_SIZE,
     getImplementation?: GetImplementation,
 ): LintingError[] {
     if (typeof schemaObj !== "object" || Array.isArray(schemaObj)) {
@@ -53,6 +57,7 @@ export function mutationLinter(
         program,
         globalRefs,
         allGlobalRefs,
+        maximumDepth,
         getImplementation,
     ).errors;
 }
@@ -61,6 +66,7 @@ export function noMutation(
     program: types.Node,
     globalReferences: References,
     allGlobalRefs: Map<unknown, Array<string | symbol>>,
+    maximumDepth: number,
     getImplementation?: GetImplementation,
 ): { returnValue: Reference; errors: LintingError[] } {
     // Construct global scope
@@ -82,6 +88,7 @@ export function noMutation(
         allGlobalRefs,
         errors,
         getImplementation,
+        maxDepth: maximumDepth,
     });
 
     return { returnValue, errors: dedupeErrors(errors) };
@@ -90,9 +97,16 @@ export function noMutation(
 export function noMutationRecursive(
     state: State,
 ): Reference {
-    const { node, hoistedRefStacks, currentRefs, allGlobalRefs, errors } =
-        state;
+    const {
+        node,
+        hoistedRefStacks,
+        currentRefs,
+        allGlobalRefs,
+        errors,
+        maxDepth,
+    } = state;
     const returnValue = new Reference();
+    if (maxDepth <= 0) return returnValue;
 
     traverse(node, {
         // We still need to keep track of non-hoisted variables (let / const)
@@ -357,6 +371,7 @@ export function noMutationRecursive(
                 allGlobalRefs,
                 currentRefs,
                 errors,
+                maxDepth,
                 hoistedRefStacks,
             }));
         },

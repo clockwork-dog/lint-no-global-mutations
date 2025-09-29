@@ -11,6 +11,7 @@ const MOCK_STATE: State = {
     currentRefs: [],
     hoistedRefStacks: {},
     node: null,
+    maxDepth: 100,
 };
 
 const destructure = (declaration: string) => {

@@ -7,9 +7,6 @@ import { arrayCallbackMethod } from "./array.ts";
 import { objectCallbackMethod } from "./object.ts";
 import { getPossibleBindings, REST_BINDING_ERR } from "./bindings.ts";
 
-// About 1% of available JS callstack size
-const MAX_CALLSTACK_SIZE = 100;
-
 export const functionTypes = new Set([
     "FunctionDeclaration",
     "FunctionExpression",
@@ -36,6 +33,7 @@ export class FunctionNode {
             currentRefs: stack,
             hoistedRefStacks: hoisted,
             errors: [],
+            maxDepth: 0,
         });
     }
 }
@@ -78,10 +76,7 @@ export function evaluateCallExpression(
             }
 
             // Only evaluate user functions (which are nodes in the AST)
-            if (
-                fn instanceof FunctionNode &&
-                state.currentRefs.length < MAX_CALLSTACK_SIZE
-            ) {
+            if (fn instanceof FunctionNode) {
                 const mergedGloals = new Map([
                     ...state.allGlobalRefs.entries(),
                     ...fn.state.allGlobalRefs.entries(),
@@ -92,6 +87,7 @@ export function evaluateCallExpression(
                             ...fn.state,
                             errors: state.errors,
                             allGlobalRefs: mergedGloals,
+                            maxDepth: state.maxDepth,
                         },
                         args,
                     ),
@@ -143,7 +139,13 @@ export function evaluateFnNode(
     state.currentRefs.unshift([fn, argumentStack]);
 
     // Evaluate expression
-    returnValue.set(noMutationRecursive({ ...state, node: fn }));
+    returnValue.set(
+        noMutationRecursive({
+            ...state,
+            node: fn,
+            maxDepth: state.maxDepth - 1,
+        }),
+    );
 
     // Remove from stack
     state.currentRefs.shift();

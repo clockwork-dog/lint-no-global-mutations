@@ -62,6 +62,8 @@ export function getPossibleReferences(state: State): Reference {
                             ast,
                             globalRefs,
                             state.allGlobalRefs,
+                            state.maxDepth - 1,
+                            getImpl,
                         );
 
                         // Is this necessary?

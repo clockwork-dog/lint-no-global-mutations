@@ -34,6 +34,7 @@ function getEx(expression: string, refs: References = {}) {
         errors: [],
         hoistedRefStacks: {},
         allGlobalRefs: new Map(),
+        maxDepth: 100,
     });
 }
 
