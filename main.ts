@@ -272,19 +272,19 @@ export function noMutationRecursive(
                         .get(),
                 ];
 
-            possibleMutations
+            const mutationPaths = possibleMutations
                 .map((ref) => allGlobalRefs.get(ref))
-                .filter((ref) => ref != undefined)
-                .forEach((path) => {
-                    errors.push(
-                        LintingError.fromNode(
-                            `Cannot mutate global variable ${
-                                pathToString(path)
-                            }`,
-                            node,
-                        ),
-                    );
-                });
+                .filter((ref) => ref != undefined);
+
+            for (const path of mutationPaths) {
+                errors.push(
+                    LintingError.fromNode(
+                        `Cannot mutate global variable ${pathToString(path)}`,
+                        node,
+                    ),
+                );
+            }
+            if (mutationPaths.length) return;
 
             const value = getPossibleReferences({ ...state, node: node.right });
             switch (node.left.type) {
