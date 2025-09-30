@@ -201,11 +201,18 @@ export function noMutationRecursive(
             const node = path?.node;
             assertIsNodePos(node);
 
-            getPossibleReferences({
+            const refs = getPossibleReferences({
                 ...state,
                 node: node.argument,
-            })
-                .get()
+            }).get();
+            const objectRefs = node.argument.type === "MemberExpression"
+                ? getPossibleReferences({
+                    ...state,
+                    node: node.argument.object,
+                }).get()
+                : [];
+
+            [...refs, ...objectRefs]
                 .map((ref) => allGlobalRefs.get(ref))
                 .filter((ref) => ref != undefined)
                 .forEach((path) => {
@@ -260,19 +267,18 @@ export function noMutationRecursive(
                 throw new Error("TODO: Destructuring");
             }
 
-            const possibleMutations = node.left.type === "Identifier"
-                ? getPossibleReferences({ ...state, node: node.left }).get()
-                : [
-                    ...getPossibleReferences({ ...state, node: node.left })
-                        .get(),
-                    ...getPossibleReferences({
-                        ...state,
-                        node: node.left.object,
-                    })
-                        .get(),
-                ];
+            const refs = getPossibleReferences({
+                ...state,
+                node: node.left,
+            }).get();
+            const objectRefs = node.left.type === "MemberExpression"
+                ? getPossibleReferences({
+                    ...state,
+                    node: node.left.object,
+                }).get()
+                : [];
 
-            const mutationPaths = possibleMutations
+            const mutationPaths = [...refs, ...objectRefs]
                 .map((ref) => allGlobalRefs.get(ref))
                 .filter((ref) => ref != undefined);
 

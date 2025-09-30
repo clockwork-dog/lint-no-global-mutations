@@ -33,6 +33,7 @@ const schemaObj1 = {
     scenes: {
         values: {},
     },
+    primitive: 1,
 };
 const schemaObj2 = {
     window: {},
@@ -40,6 +41,7 @@ const schemaObj2 = {
     scenes: {
         values: {},
     },
+    primitive: 1,
 };
 const schemaGetThrows = {
     window: {},
@@ -51,6 +53,7 @@ const schemaGetThrows = {
             },
         },
     },
+    primitive: 1,
 };
 
 const getImpl: GetImplementation = (path: Array<string | symbol>) => {
@@ -114,7 +117,16 @@ Deno.test("doesn't touch getters", () => {
 
     assertEquals(errors, []);
 });
+Deno.test("can't edit implementation", () => {
+    const getGlobal = parse(
+        `scenes.values.primitive++`,
+    );
 
+    const errors = mutationLinter(getGlobal, schemaGetThrows, 100, getImpl);
+
+    assertEquals(errors.length, 1);
+    assertStringIncludes(errors[0]!.message, "scenes.values");
+});
 Deno.test("Max map size (nested arrays)", () => {
     const BREAKING_STACK_SIZE = 1000;
 
